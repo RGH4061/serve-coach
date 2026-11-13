@@ -1,0 +1,41 @@
+{
+  "note": "Professional reference serves. Values are PLACEHOLDER ESTIMATES until replaced with numbers extracted from real footage using the 'Download analysis' button. Only numbers are stored here - never commit pro video files to this repo.",
+  "pros": [
+    {
+      "id": "Pro A",
+      "stance": "pinpoint",
+      "source": "placeholder",
+      "metrics": {
+        "kneeFlex": 65,
+        "trophyElbow": 95,
+        "shoulderTilt": 25,
+        "tossHeight": 0.25,
+        "tossPlacement": 0.35,
+        "racquetDrop": 0.15,
+        "contactHeight": 1.55,
+        "armExtension": 168,
+        "jump": 0.15,
+        "legDriveLead": 0.15,
+        "landing": 0.6
+      }
+    },
+    {
+      "id": "Pro B",
+      "stance": "platform",
+      "source": "placeholder",
+      "metrics": {
+        "kneeFlex": 58,
+        "trophyElbow": 100,
+        "shoulderTilt": 22,
+        "tossHeight": 0.22,
+        "tossPlacement": 0.3,
+        "racquetDrop": 0.12,
+        "contactHeight": 1.52,
+        "armExtension": 165,
+        "jump": 0.08,
+        "legDriveLead": 0.15,
+        "landing": 0.45
+      }
+    }
+  ]
+}

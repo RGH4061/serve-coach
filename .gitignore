@@ -1,0 +1,9 @@
+# Never commit video files (especially pro footage)
+*.mp4
+*.mov
+*.MOV
+*.m4v
+*.avi
+*.webm
+.DS_Store
+node_modules/
