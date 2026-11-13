@@ -27,6 +27,10 @@ const median = (arr) => {
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
+const percentile = (arr, q) => {
+  const s = arr.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+  return s.length ? s[Math.min(s.length - 1, Math.floor(q * s.length))] : NaN;
+};
 // Angle at point b (in degrees) made by a-b-c. 180 = straight line.
 export function angleAt(a, b, c) {
   const v1 = { x: a.x - b.x, y: a.y - b.y };
@@ -120,8 +124,16 @@ export function analyseServe(rawFrames, options = {}) {
   const early = frames.slice(0, Math.max(3, Math.round(n * 0.15)));
 
   // 1. Player height in pixels (nose to ankles, plus a bit for the top of the head)
-  const H = median(early.map((f) => (mid(P(f, J.lAnkle), P(f, J.rAnkle)).y - P(f, J.nose).y) * 1.12));
-  const groundY = median(early.map((f) => Math.max(P(f, J.lAnkle).y, P(f, J.rAnkle).y)));
+  // Measured from body segment lengths (shin, thigh, torso, neck) rather than standing height,
+  // so it still works when the player is bent over bouncing the ball. Ankle-to-nose is about
+  // 88% of full height, hence the 1.136.
+  const upright = frames.slice(0, Math.max(10, Math.round(n * 0.9)));
+  const seg = (fn) => percentile(upright.map(fn), 0.75);
+  const H = 1.136 * (
+    seg((f) => (dist(P(f, J.lKnee), P(f, J.lAnkle)) + dist(P(f, J.rKnee), P(f, J.rAnkle))) / 2) +
+    seg((f) => (dist(P(f, J.lHip), P(f, J.lKnee)) + dist(P(f, J.rHip), P(f, J.rKnee))) / 2) +
+    seg((f) => dist(mid(P(f, J.lHip), P(f, J.rHip)), mid(P(f, J.lShoulder), P(f, J.rShoulder)))) +
+    seg((f) => dist(mid(P(f, J.lShoulder), P(f, J.rShoulder)), P(f, J.nose))));
 
   // 2. Which hand hits? The hitting wrist reaches higher (smaller y) than the tossing wrist.
   let hand = options.hand;
@@ -165,6 +177,11 @@ export function analyseServe(rawFrames, options = {}) {
   }
   if (trophyIdx < 0) trophyIdx = Math.max(0, contactIdx - 1);
   const trophy = frames[trophyIdx];
+
+  // Ground level: where the feet are in the half-second before the trophy position,
+  // when the player is set at the baseline (not walking in or bouncing the ball).
+  const setUp = frames.filter((f) => f.t >= trophy.t - 0.5 * timeScale && f.t <= trophy.t);
+  const groundY = median(setUp.map((f) => Math.max(P(f, J.lAnkle).y, P(f, J.rAnkle).y)));
 
   // 5. Which way is the court? The player moves towards it during the serve.
   const hipX = (f) => mid(P(f, J.lHip), P(f, J.rHip)).x;
@@ -220,12 +237,16 @@ export function analyseServe(rawFrames, options = {}) {
   // Racquet drop: lowest racquet point near the hitting hand between trophy and contact
   let low = null;
   frames.slice(trophyIdx, contactIdx + 1).forEach((f) => {
-    if (f.racket && dist(f.racket, P(f, S.hW)) < 0.6 * H && (!low || f.racket.y > low.y)) low = f.racket;
+    // The drop is over well before contact; anything "below the hand" at contact is a false detection.
+    if (contact.t - f.t < 0.05 * timeScale) return;
+    if (!f.racket || dist(f.racket, P(f, S.hW)) > 0.6 * H) return;
+    const below = (f.racket.y - P(f, S.hS).y) / H; // how far below the shoulder, in this frame
+    if (below > 0 && f.racket.y > P(f, S.hW).y && (!low || below > low.below)) low = { below, t: f.t };
   });
-  if (low) {
-    const shY = P(frames[trophyIdx], S.hS).y;
-    m.racquetDrop = (low.y - shY) / H;
-  }
+  // Only count frames where the racquet is seen below the shoulder and the hand, i.e. really
+  // dropped behind the back. It is often too blurred to detect there, so if it is never seen
+  // this stays blank rather than guessing from the racquet on its way up.
+  if (low) m.racquetDrop = low.below;
 
   // Leg drive timing: when the hips rise fastest compared with when contact happens
   let peakRise = -Infinity, riseIdx = null;
@@ -236,15 +257,16 @@ export function analyseServe(rawFrames, options = {}) {
   }
   if (riseIdx !== null) m.legDriveLead = (contact.t - frames[riseIdx].t) / timeScale;
 
-  // Landing: how far forward the front foot ends up (needs ~0.5 s of video after contact)
-  if (n - 1 - contactIdx >= 5) {
-    const after = frames.slice(contactIdx);
-    const furthest = Math.max(...after.map((f) => frontAnkleX(f) * dir));
-    m.landing = (furthest - frontAnkleX(frames[0]) * dir) / H;
-  }
+  // Landing: where the front foot first touches down after contact (not where the player
+  // runs to afterwards, e.g. a doubles player moving in to the net).
+  const after = frames.slice(contactIdx + 1).filter((f) => f.t - contact.t <= 0.6 * timeScale);
+  const lowFoot = (f) => Math.max(P(f, J.lAnkle).y, P(f, J.rAnkle).y);
+  const wasAir = after.findIndex((f) => groundY - lowFoot(f) > 0.03 * H);
+  const touch = wasAir >= 0 ? after.slice(wasAir).find((f) => groundY - lowFoot(f) <= 0.03 * H) : null;
+  if (touch) m.landing = (frontAnkleX(touch) * dir - frontAnkleX(trophy) * dir) / H;
 
   return {
-    version: 'analysis-0.1',
+    version: 'analysis-0.2',
     hand, stance, detectedStance, dir,
     playerHeightPx: H,
     playerHeightCm: options.heightCm || null,

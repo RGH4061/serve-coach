@@ -22,7 +22,7 @@ check('contact height ~1.55 H (from ball)', near(m.contactHeight, 1.55, 0.06) &&
 check('toss height ~0.25 H', near(m.tossHeight, 0.25, 0.05), m.tossHeight?.toFixed(2));
 check('toss placement ~0.35 H in front', near(m.tossPlacement, 0.35, 0.06), m.tossPlacement?.toFixed(2));
 check('jump ~0.12 H', near(m.jump, 0.12, 0.03), m.jump?.toFixed(2));
-check('landing ~0.6 H', near(m.landing, 0.6, 0.1), m.landing?.toFixed(2));
+check('first landing step forward of the trophy foot', m.landing > 0.15 && m.landing < 0.6, m.landing?.toFixed(2));
 check('leg drive before contact', m.legDriveLead > 0.03 && m.legDriveLead < 0.35, m.legDriveLead?.toFixed(2));
 check('knee bend measured', m.kneeFlex > 15 && m.kneeFlex < 120, m.kneeFlex?.toFixed(0));
 check('arm straight at contact', m.armExtension > 160, m.armExtension?.toFixed(0));
