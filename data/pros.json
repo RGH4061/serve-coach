@@ -1,5 +1,5 @@
 {
-  "note": "Professional reference serves. Values are PLACEHOLDER ESTIMATES until replaced with numbers extracted from real footage using the 'Download analysis' button. Only numbers are stored here - never commit pro video files to this repo.",
+  "note": "Professional reference serves. Pro A and Pro B are PLACEHOLDER ESTIMATES (numbers only). Pros with source 'footage' were measured from real clips and have a 'motion' file for the side-by-side stick figure. Add more with: node tools/add-pro.mjs <analysis.json> \"Pro D\" --height 185 --view side. Never commit video files.",
   "pros": [
     {
       "id": "Pro A",
@@ -17,7 +17,10 @@
         "jump": 0.15,
         "legDriveLead": 0.15,
         "landing": 0.6
-      }
+      },
+      "hand": "right",
+      "view": "side",
+      "heightCm": null
     },
     {
       "id": "Pro B",
@@ -35,6 +38,29 @@
         "jump": 0.08,
         "legDriveLead": 0.15,
         "landing": 0.45
+      },
+      "hand": "right",
+      "view": "side",
+      "heightCm": null
+    },
+    {
+      "id": "Pro C",
+      "stance": "platform",
+      "hand": "right",
+      "view": "front",
+      "heightCm": null,
+      "source": "footage",
+      "analysisVersion": "analysis-0.3",
+      "motion": "data/pros/pro-c.json",
+      "metrics": {
+        "kneeFlex": 61.544,
+        "trophyElbow": 99.739,
+        "shoulderTilt": 22.219,
+        "contactHeight": 1.514,
+        "armExtension": 159.996,
+        "jump": 0.088,
+        "tossHeight": 0.165,
+        "legDriveLead": 0.117
       }
     }
   ]

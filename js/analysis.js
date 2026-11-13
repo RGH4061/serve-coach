@@ -68,7 +68,7 @@ export const METRICS = {
   tossHeight:    { phase: 'toss', scale: [-0.2, 0.7], label: 'Toss peak above contact point', unit: 'H', tol: 0.1, weight: 1.0,
                    low: 'Your toss is low, so you are rushing. Toss a little higher so the ball peaks just above where you hit it.',
                    high: 'Your toss is going quite high, so the ball is falling fast at contact. Toss a bit lower for better timing.' },
-  tossPlacement: { phase: 'toss', scale: [-0.3, 0.8], label: 'Toss in front of front foot', unit: 'H', tol: 0.12, weight: 1.3,
+  tossPlacement: { sideOnly: true, phase: 'toss', scale: [-0.3, 0.8], label: 'Toss in front of front foot', unit: 'H', tol: 0.12, weight: 1.3,
                    low: 'Your toss is not far enough in front. Toss slightly more into the court so your body moves forward into the ball.',
                    high: 'Your toss is far in front of you, which often sends the ball into the net. Bring the toss back slightly.' },
   racquetDrop:   { phase: 'contact', scale: [-0.2, 0.4], label: 'Racquet drop below shoulder', unit: 'H', tol: 0.08, weight: 0.8,
@@ -86,7 +86,7 @@ export const METRICS = {
   legDriveLead:  { phase: 'finish', scale: [0, 0.5], label: 'Leg drive before contact', unit: 's', tol: 0.08, weight: 1.0,
                    low: 'Your legs and arm are firing almost together. Push up with your legs first, then let the arm follow.',
                    high: 'Your leg drive is happening a long time before contact, so the energy is lost. Link the push up and swing more tightly.' },
-  landing:       { phase: 'finish', scale: [0, 1.2], label: 'Landing distance into court', unit: 'H', tol: 0.15, weight: 0.6,
+  landing:       { sideOnly: true, phase: 'finish', scale: [0, 1.2], label: 'Landing distance into court', unit: 'H', tol: 0.15, weight: 0.6,
                    low: 'You are landing close to where you started. Let your body move forward into the court after contact.',
                    high: 'You are travelling a long way forward after the serve — good if you serve and volley, otherwise check your balance.' },
 };
@@ -265,10 +265,16 @@ export function analyseServe(rawFrames, options = {}) {
   const touch = wasAir >= 0 ? after.slice(wasAir).find((f) => groundY - lowFoot(f) <= 0.03 * H) : null;
   if (touch) m.landing = (frontAnkleX(touch) * dir - frontAnkleX(trophy) * dir) / H;
 
+  // Forward/backward distances can only be measured when filmed side-on.
+  const view = options.view || 'side';
+  if (view !== 'side') for (const [k, def] of Object.entries(METRICS)) if (def.sideOnly) delete m[k];
+
   return {
-    version: 'analysis-0.2',
-    hand, stance, detectedStance, dir,
+    version: 'analysis-0.3',
+    hand, stance, detectedStance, dir, view, timeScale,
     playerHeightPx: H,
+    groundY,
+    anchorX: mid(P(trophy, J.lAnkle), P(trophy, J.rAnkle)).x,
     playerHeightCm: options.heightCm || null,
     keyFrames: { trophy: trophy.t, contact: contact.t, tossPeak: peak ? peak.f.t : null },
     framesWithPlayer: n,
@@ -281,8 +287,10 @@ export function analyseServe(rawFrames, options = {}) {
 // ---------- comparing with professional references ----------
 // refs: the contents of data/pros.json
 export function compareToPros(result, refs) {
-  const pros = refs.pros.filter((p) => p.stance === result.stance);
-  const group = pros.length ? pros : refs.pros;
+  // Compare with pros of the same stance, filmed from the same angle if we have any.
+  const sameStance = refs.pros.filter((p) => p.stance === result.stance);
+  const sameView = sameStance.filter((p) => (p.view || 'side') === (result.view || 'side'));
+  const group = sameView.length ? sameView : sameStance.length ? sameStance : refs.pros;
   const rows = [];
   let total = 0, weights = 0;
   for (const [key, def] of Object.entries(METRICS)) {
@@ -325,4 +333,69 @@ export function buildFeedback(comparison, ticked = []) {
     }))
     .sort((a, b) => b.priority - a.priority);
   return items.slice(0, 3);
+}
+
+// ---------- stick-figure comparison with a pro ----------
+// Joints kept for drawing: nose, shoulders, elbows, wrists, hips, knees, ankles.
+export const MOTION_JOINTS = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+
+// A compact copy of the movement (from about 1 s before the trophy to just after landing),
+// so a serve can be replayed as a stick figure or saved as a pro reference.
+export function exportMotion(frames, r) {
+  const ts = r.timeScale || 1;
+  const r1 = (v) => Math.round(v * 10) / 10;
+  const keep = frames.filter((f) => f.pose && f.t >= r.keyFrames.trophy - 1.0 * ts && f.t <= r.keyFrames.contact + 0.8 * ts);
+  return {
+    hand: r.hand, stance: r.stance, view: r.view || 'side', dir: r.dir, timeScale: ts,
+    H: r.playerHeightPx, groundY: r.groundY, anchorX: r.anchorX, keyFrames: r.keyFrames,
+    frames: keep.map((f) => ({
+      t: Math.round(f.t * 1000) / 1000,
+      j: MOTION_JOINTS.map((i) => [r1(f.pose[i].x), r1(f.pose[i].y)]),
+      b: f.ball ? [r1(f.ball.x), r1(f.ball.y)] : null,
+    })),
+  };
+}
+
+// Choose the pro to show next to the player. Most important first: same stance, same camera
+// angle, similar height, same hitting hand. Returns the pro and the reasons for the choice.
+export function pickPro(refs, { stance, view = 'side', hand, heightCm }) {
+  const options = refs.pros.filter((p) => p.motion);
+  if (!options.length) return null;
+  const cost = (p) =>
+    (p.stance === stance ? 0 : 100) +
+    ((p.view || 'side') === view ? 0 : 50) +
+    (p.hand === hand ? 0 : 20) +
+    (heightCm && p.heightCm ? Math.abs(p.heightCm - heightCm) / 2 : 5);
+  const pro = options.slice().sort((a, b) => cost(a) - cost(b))[0];
+  const notes = [];
+  notes.push(pro.stance === stance ? `same ${stance} stance` : `no ${stance}-stance pro yet`);
+  notes.push((pro.view || 'side') === view ? `same camera angle` : `filmed ${pro.view}-on, you are ${view}-on`);
+  if (heightCm && pro.heightCm) notes.push(`${pro.heightCm} cm vs your ${heightCm} cm`);
+  notes.push(pro.hand === hand ? `${hand}-handed` : `pro is ${pro.hand}-handed`);
+  return { pro, notes };
+}
+
+// Lines up two serves by their key moments, so both figures reach the trophy and contact
+// together even if one serve is faster. Returns the pro's time for the player's time t.
+export function alignTime(t, you, pro) {
+  const yk = you.keyFrames, pk = pro.keyFrames;
+  const ys = you.timeScale || 1, ps = pro.timeScale || 1;
+  if (t <= yk.trophy) return pk.trophy - ((yk.trophy - t) / ys) * ps;
+  if (t >= yk.contact) return pk.contact + ((t - yk.contact) / ys) * ps;
+  const k = (t - yk.trophy) / (yk.contact - yk.trophy || 1);
+  return pk.trophy + k * (pk.contact - pk.trophy);
+}
+
+// Turns a motion frame into body-relative coordinates: units of player height, feet at 0,
+// court always to the right, centred on where the feet were at the trophy position.
+export function normaliseFrame(motion, frame) {
+  if (!frame) return null;
+  const n = (x, y) => ({ x: ((x - motion.anchorX) * (motion.dir || 1)) / motion.H, y: (motion.groundY - y) / motion.H });
+  return { joints: frame.j.map(([x, y]) => n(x, y)), ball: frame.b ? n(frame.b[0], frame.b[1]) : null };
+}
+
+export function motionFrameAt(motion, t) {
+  let best = null;
+  for (const f of motion.frames) if (!best || Math.abs(f.t - t) < Math.abs(best.t - t)) best = f;
+  return best;
 }

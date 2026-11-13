@@ -1,7 +1,7 @@
 // Tests the serve analysis on a made-up (synthetic) serve where we know the right answers.
 // Run with:  node tests/analysis.test.mjs
 import { readFileSync } from 'node:fs';
-import { analyseServe, compareToPros, buildFeedback } from '../js/analysis.js';
+import { analyseServe, compareToPros, buildFeedback, exportMotion, pickPro, alignTime, normaliseFrame, motionFrameAt } from '../js/analysis.js';
 import { makeServe, H, G, FPS } from '../js/synthetic.js';
 
 let failures = 0;
@@ -53,6 +53,29 @@ check('overall score 0-100', c.overall >= 0 && c.overall <= 100, c.overall);
 const lowServe = { ...r, metrics: { ...m, contactHeight: 1.2 } };
 const fb = buildFeedback(compareToPros(lowServe, refs), ['net']);
 check('low contact + "net" ticked puts contact height first', fb[0] && fb[0].key === 'contactHeight', fb.map((f) => f.key).join(','));
+
+// Stick-figure comparison helpers
+const motion = exportMotion(makeServe(), r);
+check('motion covers trophy to after contact', motion.frames[0].t <= r.keyFrames.trophy && motion.frames.at(-1).t > r.keyFrames.contact, `${motion.frames[0].t}-${motion.frames.at(-1).t}`);
+const atContact = normaliseFrame(motion, motionFrameAt(motion, r.keyFrames.contact));
+check('normalised feet near ground at start', Math.abs(normaliseFrame(motion, motion.frames[0]).joints[11].y) < 0.05);
+check('normalised ball ~1.55 H at contact', near(atContact.ball.y, 1.55, 0.06), atContact.ball.y.toFixed(2));
+const slowMotion = { ...motion, timeScale: 4, keyFrames: { trophy: motion.keyFrames.trophy * 4, contact: motion.keyFrames.contact * 4 } };
+check('alignTime maps trophy to trophy', Math.abs(alignTime(r.keyFrames.trophy, motion, slowMotion) - slowMotion.keyFrames.trophy) < 1e-9);
+check('alignTime maps contact to contact', Math.abs(alignTime(r.keyFrames.contact, motion, slowMotion) - slowMotion.keyFrames.contact) < 1e-9);
+check('alignTime keeps real-time pace after contact', Math.abs(alignTime(r.keyFrames.contact + 0.1, motion, slowMotion) - (slowMotion.keyFrames.contact + 0.4)) < 1e-9);
+const lib = { pros: [
+  { id: 'P1', stance: 'platform', view: 'side', hand: 'right', heightCm: 200, motion: 'x' },
+  { id: 'P2', stance: 'pinpoint', view: 'front', hand: 'right', heightCm: 180, motion: 'x' },
+  { id: 'P3', stance: 'pinpoint', view: 'side', hand: 'left', heightCm: 185, motion: 'x' },
+  { id: 'P4', stance: 'pinpoint', view: 'side', hand: 'right', heightCm: 198, motion: 'x' },
+  { id: 'P5', stance: 'pinpoint', view: 'side', hand: 'right', heightCm: 183 },
+] };
+check('pickPro: stance, then view, then hand, then height', pickPro(lib, { stance: 'pinpoint', view: 'side', hand: 'right', heightCm: 183 }).pro.id === 'P4');
+check('pickPro: left-hander gets left-handed pro', pickPro(lib, { stance: 'pinpoint', view: 'side', hand: 'left', heightCm: 183 }).pro.id === 'P3');
+check('pickPro: ignores pros without movement data', pickPro({ pros: [lib.pros[4]] }, { stance: 'pinpoint', hand: 'right' }) === null);
+const front = analyseServe(makeServe(), { view: 'front' });
+check('front-on view drops side-only measurements', !('tossPlacement' in front.metrics) && !('landing' in front.metrics));
 
 console.log(failures ? `\n${failures} test(s) failed` : '\nAll tests passed');
 process.exit(failures ? 1 : 0);

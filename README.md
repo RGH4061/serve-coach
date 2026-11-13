@@ -25,7 +25,14 @@ Measurements use **H** (the player's height) as the unit, so players of differen
 | `css/style.css` | Styling |
 | `js/app.js` | Page logic: upload, frame stepping, drawing, results |
 | `js/detectors.js` | Loads and runs MediaPipe Pose and YOLO |
-| `js/analysis.js` | Serve measurements, pro comparison, feedback (no browser code, so it can be tested) |
+| `js/analysis.js` | Serve measurements, pro comparison, pro matching, feedback (no browser code, so it can be tested) |
+| `js/dashboard.js` | Score ring, phase cards, progress chart |
+| `js/viewer.js` | Video panel, overlay drawing, timeline and trim |
+| `js/compare.js` | "You vs Pro" stick-figure panel |
+| `js/synthetic.js` | Computer-generated example serve (tests and example dashboard) |
+| `data/pros/` | Recorded pro movements for the side-by-side |
+| `tools/add-pro.mjs` | Adds a pro reference from a downloaded analysis file |
+| `docs/accuracy-roadmap.md` | Known error sources and planned accuracy improvements |
 | `data/pros.json` | Professional reference numbers (Pro A, Pro B, …) |
 | `models/yolo11n.onnx` | YOLO model file |
 | `tests/` | Tests for the analysis code (`node tests/analysis.test.mjs`) |
@@ -34,9 +41,11 @@ Measurements use **H** (the player's height) as the unit, so players of differen
 
 Pros are stored anonymously as Pro A, Pro B and so on, grouped by stance. The current values are **placeholder estimates**. To add a real reference:
 
-1. Run the pro's serve through the page.
+1. Run the pro's serve through the page (set the camera angle and the pro's height).
 2. Click **Download analysis (JSON)**.
-3. Copy the `metrics` block into `data/pros.json` with a new id, the stance, and `"source": "footage"`.
+3. Run `node tools/add-pro.mjs serve-analysis.json "Pro D" --height 185 --view side`, then commit and push.
+
+Pros added this way also appear in the "You vs Pro" side-by-side, matched by stance, camera angle, hitting hand and height.
 
 Only numbers go in this repo. Video files are blocked by `.gitignore`. Renaming a pro does not change who owns the footage, so check the rights before any public or commercial launch.
 

@@ -38,6 +38,13 @@
             <option value="left">Left-handed</option>
           </select>
         </label>
+        <label class="field" for="view">Camera angle
+          <select id="view">
+            <option value="side">Side-on (best)</option>
+            <option value="front">Front-on (facing the server)</option>
+            <option value="behind">From behind</option>
+          </select>
+        </label>
         <label class="field" for="heightCm">Player height in cm (optional)
           <input type="number" id="heightCm" min="100" max="230" step="1" placeholder="e.g. 183" inputmode="numeric">
           <span class="field-note">Shows distances above the ground in cm and metres. For a pro clip, enter the pro's height.</span>
@@ -130,6 +137,20 @@
 
         <section class="panel summary-panel" id="summary" aria-label="Summary"></section>
       </div>
+
+      <section class="panel compare-panel hidden" id="comparePanel" aria-label="You compared with a pro">
+        <div class="section-head">
+          <h2 id="compareTitle">You vs Pro</h2>
+          <div class="seg" role="group" aria-label="Comparison view">
+            <button type="button" data-mode="side" aria-pressed="true">Side by side</button>
+            <button type="button" data-mode="overlay" aria-pressed="false">Overlay</button>
+          </div>
+        </div>
+        <div class="compare-body">
+          <canvas id="compareCanvas" width="900" height="480"></canvas>
+          <div class="compare-notes" id="compareNotes"></div>
+        </div>
+      </section>
 
       <section aria-label="Serve phases">
         <div class="section-head">

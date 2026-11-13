@@ -3,7 +3,8 @@
 //   sidebar options -> run the models frame by frame -> measure the serve -> draw the dashboard.
 // Before a video is analysed, the dashboard shows example results from a computer-generated serve.
 
-import { analyseServe, compareToPros, buildFeedback, ISSUES } from './analysis.js';
+import { analyseServe, compareToPros, buildFeedback, ISSUES, exportMotion, pickPro } from './analysis.js';
+import { createComparison } from './compare.js';
 import { renderSummary, renderPhases, renderHistory } from './dashboard.js';
 import { createViewer } from './viewer.js';
 import { makeServe, FPS } from './synthetic.js';
@@ -16,6 +17,7 @@ const wctx = work.getContext('2d', { willReadFrequently: true });
 let refs = null;        // professional reference numbers (data/pros.json)
 let lastResult = null;  // the latest real analysis
 let shown = null;       // whichever result is on screen (example or real)
+let shownMotion = null; // that result's movement, for the stick-figure comparison
 const isPreview = Boolean(window.__PREVIEW);
 
 const viewer = createViewer({
@@ -23,6 +25,38 @@ const viewer = createViewer({
   play: $('play'), back: $('back'), fwd: $('fwd'), speed: $('speed'),
   showPose: $('showPose'), showBall: $('showBall'), showRacket: $('showRacket'), trimShade: $('trimShade'),
 });
+
+// ---------- you vs pro ----------
+const comparison = createComparison($('compareCanvas'));
+viewer.onFrame((t) => { if (!$('comparePanel').classList.contains('hidden')) comparison.draw(t); });
+document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  comparison.setMode(b.dataset.mode);
+}));
+const motionCache = {};
+async function loadMotion(path) {
+  if (window.__PRO_MOTIONS && window.__PRO_MOTIONS[path]) return window.__PRO_MOTIONS[path];
+  if (!motionCache[path]) motionCache[path] = fetch(path).then((r) => r.json());
+  return motionCache[path];
+}
+async function showComparison(r, motion) {
+  const choice = pickPro(refs, { stance: r.stance, view: r.view || 'side', hand: r.hand, heightCm: heightCm() });
+  if (!choice || !motion || !motion.frames.length) { $('comparePanel').classList.add('hidden'); return; }
+  const proMotion = await loadMotion(choice.pro.motion);
+  comparison.set(motion, proMotion, choice.pro.id);
+  $('compareTitle').textContent = `You vs ${choice.pro.id}`;
+  const p = choice.pro;
+  $('compareNotes').innerHTML = `
+    <h3>${p.id}</h3>
+    <p>${p.stance === 'pinpoint' ? 'Pinpoint' : 'Platform'} stance · ${p.hand}-handed${p.heightCm ? ` · ${p.heightCm} cm` : ''} · filmed ${p.view}-on</p>
+    <p class="why">Picked because: ${choice.notes.join(' · ')}.</p>
+    <ul>
+      <li>Both figures are scaled to the same height, so you compare shape and timing, not size.</li>
+      <li>They are lined up on the trophy and contact moments, so a slower serve still matches up.</li>
+      <li>Hitting arm is shown in blue. Use the timeline or Play above to move both together.</li>
+    </ul>`;
+  $('comparePanel').classList.remove('hidden');
+}
 
 // ---------- trimming ----------
 let trim = null; // { start, end } in seconds, or null for the whole clip
@@ -64,6 +98,7 @@ $('heightCm').addEventListener('input', () => {
   if (shown) {
     shown.playerHeightCm = heightCm();
     renderPhases($('phases'), shown.comparison, heightCm());
+    showComparison(shown, shownMotion);
   }
   setRefNote();
 });
@@ -81,6 +116,8 @@ function showExample() {
   r.comparison = compareToPros(r, refs);
   r.feedback = buildFeedback(r.comparison, ['net']);
   shown = r;
+  shownMotion = exportMotion(frames, r);
+  showComparison(r, shownMotion);
   renderSummary($('summary'), r);
   renderPhases($('phases'), r.comparison, heightCm());
   const weeks = [52, 57, 55, 63, r.comparison.overall];
@@ -109,6 +146,7 @@ $('file').addEventListener('change', () => {
     viewer.set({ mode: 'live', width: work.width, height: work.height, duration: video.duration, step: 1 / Number($('rate').value) });
     $('banner').innerHTML = '<b>Video loaded.</b> Trim it to the serve under the video, check the options on the left, then press Analyse serve.';
     $('trimTools').classList.remove('hidden');
+    $('comparePanel').classList.add('hidden');
     setTrim(null);
     viewer.seek(0);
     $('analyse').disabled = false;
@@ -130,12 +168,14 @@ $('analyse').addEventListener('click', async () => {
     const det = await getDetectors();
     await det.loadModels(setStatus);
     const frames = await processVideo(det);
-    const r = analyseServe(frames, { hand: $('hand').value, stance: $('stance').value, timeScale: Number($('timeScale').value), heightCm: heightCm() });
+    const r = analyseServe(frames, { hand: $('hand').value, stance: $('stance').value, timeScale: Number($('timeScale').value), heightCm: heightCm(), view: $('view').value });
     r.issues = ticked();
     r.comparison = compareToPros(r, refs);
     r.feedback = buildFeedback(r.comparison, r.issues);
     r.date = new Date().toISOString();
     lastResult = shown = r;
+    shownMotion = r.motion = exportMotion(frames, r);
+    showComparison(r, shownMotion);
     renderSummary($('summary'), r);
     renderPhases($('phases'), r.comparison, heightCm());
     saveHistory(r);

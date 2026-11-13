@@ -10,7 +10,7 @@ const KEYS = [['tossPeak', 'Toss peak'], ['trophy', 'Trophy'], ['contact', 'Cont
 export function createViewer(els) {
   const { video, canvas, range, markers, time, play, back, fwd, speed, showPose, showBall, showRacket, trimShade } = els;
   const ctx = canvas.getContext('2d');
-  const s = { mode: 'example', frames: [], keyFrames: {}, t: 0, playing: false, duration: 1, step: 1 / 60, prev: null, trim: null };
+  const s = { mode: 'example', frames: [], keyFrames: {}, t: 0, playing: false, duration: 1, step: 1 / 60, prev: null, trim: null, onFrame: null };
 
   const now = () => (s.mode === 'live' ? video.currentTime : s.t);
   function seek(t) {
@@ -116,6 +116,7 @@ export function createViewer(els) {
     if (document.activeElement !== range) range.value = t;
     time.textContent = `${t.toFixed(2)} s / ${s.duration.toFixed(2)} s`;
     if (s.frames.length || s.mode === 'example') drawFrame(frameAt(t));
+    if (s.onFrame) s.onFrame(t);
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
@@ -136,6 +137,7 @@ export function createViewer(els) {
     drawFrame,
     seek,
     now,
+    onFrame(fn) { s.onFrame = fn; },
     // Highlight the part of the clip that will be analysed (null = whole clip).
     setTrim(trim) {
       s.trim = trim;
