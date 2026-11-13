@@ -8,9 +8,9 @@ const BONES = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 
 const KEYS = [['tossPeak', 'Toss peak'], ['trophy', 'Trophy'], ['contact', 'Contact']];
 
 export function createViewer(els) {
-  const { video, canvas, range, markers, time, play, back, fwd, speed, showPose, showBall, showRacket } = els;
+  const { video, canvas, range, markers, time, play, back, fwd, speed, showPose, showBall, showRacket, trimShade } = els;
   const ctx = canvas.getContext('2d');
-  const s = { mode: 'example', frames: [], keyFrames: {}, t: 0, playing: false, duration: 1, step: 1 / 60, prev: null };
+  const s = { mode: 'example', frames: [], keyFrames: {}, t: 0, playing: false, duration: 1, step: 1 / 60, prev: null, trim: null };
 
   const now = () => (s.mode === 'live' ? video.currentTime : s.t);
   function seek(t) {
@@ -90,7 +90,8 @@ export function createViewer(els) {
 
   play.addEventListener('click', () => {
     if (s.playing) return stop();
-    if (now() >= s.duration - s.step) seek(0);
+    const start = s.trim ? s.trim.start : 0, end = s.trim ? s.trim.end : s.duration;
+    if (now() < start || now() >= end - s.step) seek(start);
     s.playing = true;
     play.textContent = 'Pause';
     if (s.mode === 'live') { video.playbackRate = Number(speed.value); video.play(); }
@@ -109,6 +110,8 @@ export function createViewer(els) {
       s.t += dt * Number(speed.value);
       if (s.t >= s.duration) { s.t = s.duration; stop(); }
     }
+    // When trimmed, playback stops at the end of the trimmed part.
+    if (s.playing && s.mode === 'live' && s.trim && video.currentTime >= s.trim.end) { stop(); seek(s.trim.end); }
     const t = now();
     if (document.activeElement !== range) range.value = t;
     time.textContent = `${t.toFixed(2)} s / ${s.duration.toFixed(2)} s`;
@@ -122,6 +125,7 @@ export function createViewer(els) {
     set({ mode, frames = [], keyFrames = {}, width, height, duration, step }) {
       stop();
       Object.assign(s, { mode, frames, keyFrames, duration: duration || 1, step: step || s.step });
+      if (mode === 'example') this.setTrim(null);
       canvas.width = width; canvas.height = height;
       canvas.classList.toggle('solo', mode === 'example');
       video.classList.toggle('hidden', mode === 'example');
@@ -131,5 +135,15 @@ export function createViewer(els) {
     },
     drawFrame,
     seek,
+    now,
+    // Highlight the part of the clip that will be analysed (null = whole clip).
+    setTrim(trim) {
+      s.trim = trim;
+      trimShade.classList.toggle('hidden', !trim);
+      if (trim) {
+        trimShade.style.left = `${(trim.start / s.duration) * 100}%`;
+        trimShade.style.width = `${((trim.end - trim.start) / s.duration) * 100}%`;
+      }
+    },
   };
 }

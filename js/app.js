@@ -21,8 +21,30 @@ const isPreview = Boolean(window.__PREVIEW);
 const viewer = createViewer({
   video, canvas: $('overlay'), range: $('scrub'), markers: $('ticks'), time: $('time'),
   play: $('play'), back: $('back'), fwd: $('fwd'), speed: $('speed'),
-  showPose: $('showPose'), showBall: $('showBall'), showRacket: $('showRacket'),
+  showPose: $('showPose'), showBall: $('showBall'), showRacket: $('showRacket'), trimShade: $('trimShade'),
 });
+
+// ---------- trimming ----------
+let trim = null; // { start, end } in seconds, or null for the whole clip
+function setTrim(next) {
+  trim = next;
+  viewer.setTrim(trim);
+  const a = trim ? trim.start : 0, b = trim ? trim.end : (video.duration || 0);
+  $('trimInfo').textContent = trim ? `Analysing ${a.toFixed(2)} s to ${b.toFixed(2)} s (${(b - a).toFixed(2)} s)` : `Whole clip (${b.toFixed(2)} s)`;
+}
+$('trimStart').addEventListener('click', () => {
+  const end = trim ? trim.end : video.duration;
+  const t = viewer.now();
+  if (t >= end - 0.2) return setStatus('The start must be at least 0.2 s before the end.');
+  setTrim({ start: t, end });
+});
+$('trimEnd').addEventListener('click', () => {
+  const start = trim ? trim.start : 0;
+  const t = viewer.now();
+  if (t <= start + 0.2) return setStatus('The end must be at least 0.2 s after the start.');
+  setTrim({ start, end: t });
+});
+$('trimClear').addEventListener('click', () => setTrim(null));
 
 // ---------- sidebar set-up ----------
 for (const [key, issue] of Object.entries(ISSUES)) {
@@ -85,7 +107,10 @@ $('file').addEventListener('change', () => {
     work.width = Math.round(video.videoWidth * s);
     work.height = Math.round(video.videoHeight * s);
     viewer.set({ mode: 'live', width: work.width, height: work.height, duration: video.duration, step: 1 / Number($('rate').value) });
-    $('banner').innerHTML = '<b>Video loaded.</b> Check the options on the left, then press Analyse serve. The results below are still the example.';
+    $('banner').innerHTML = '<b>Video loaded.</b> Trim it to the serve under the video, check the options on the left, then press Analyse serve.';
+    $('trimTools').classList.remove('hidden');
+    setTrim(null);
+    viewer.seek(0);
     $('analyse').disabled = false;
     setStatus(`${video.duration.toFixed(1)} s clip, ${video.videoWidth}×${video.videoHeight}.`);
   };
@@ -115,6 +140,7 @@ $('analyse').addEventListener('click', async () => {
     renderPhases($('phases'), r.comparison, heightCm());
     saveHistory(r);
     viewer.set({ mode: 'live', frames, keyFrames: r.keyFrames, width: work.width, height: work.height, duration: video.duration, step: 1 / Number($('rate').value) });
+    viewer.setTrim(trim);
     $('banner').classList.add('hidden');
     setStatus('Done. Click the markers under the video to check each key moment.');
   } catch (err) {
@@ -136,12 +162,14 @@ function seekVideo(t) {
 
 async function processVideo(det) {
   const step = 1 / Number($('rate').value);
-  const total = Math.floor(video.duration / step);
+  const start = trim ? trim.start : 0;
+  const end = trim ? trim.end : video.duration;
+  const total = Math.max(1, Math.floor((end - start) / step));
   const out = [];
   let lastBall = null;
   video.pause();
   for (let i = 0; i < total; i++) {
-    const t = i * step;
+    const t = start + i * step;
     await seekVideo(t);
     wctx.drawImage(video, 0, 0, work.width, work.height);
     const pose = det.detectPose(work, Math.round(t * 1000) + 1);

@@ -98,8 +98,17 @@
             <canvas id="overlay" width="560" height="640"></canvas>
           </div>
           <div class="timeline">
+            <div class="trim-shade hidden" id="trimShade"></div>
             <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Position in clip">
             <div class="ticks" id="ticks"></div>
+          </div>
+          <div class="trim hidden" id="trimTools">
+            <span class="trim-title">Trim to the serve</span>
+            <button type="button" id="trimStart" class="ctrl">Set start here</button>
+            <button type="button" id="trimEnd" class="ctrl">Set end here</button>
+            <button type="button" id="trimClear" class="ghost">Reset</button>
+            <span id="trimInfo" class="time"></span>
+            <p class="trim-help">Scrub to just before you start the motion and press "Set start here", then to just after landing and press "Set end here". Only that part is analysed.</p>
           </div>
           <div class="controls">
             <button type="button" id="play" class="ctrl">Play</button>
