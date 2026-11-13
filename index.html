@@ -4,127 +4,138 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Serve Coach</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="css/style.css">
   <!-- ONNX Runtime runs the YOLO model in the browser -->
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort.min.js"></script>
 </head>
 <body>
-  <header>
-    <h1>Serve Coach</h1>
-    <p class="sub">Film a serve, get a mechanical breakdown compared with professional servers.</p>
-  </header>
+  <div class="app">
+    <!-- LEFT: options -->
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Serve Coach</h1>
+        <span class="version">v0.2</span>
+      </div>
 
-  <main>
-    <section class="card">
-      <h2>1. Film your serve</h2>
-      <p>Phone on a tripod or fence, side-on to you, about 4–6 metres away. Keep your whole body <em>and</em> the top of the toss in shot. Use slow-motion (120 or 240 fps) if you can, and keep the clip short: one serve, from setting up to landing.</p>
-      <p class="hint">If an iPhone video won't load, set Settings › Camera › Formats to "Most Compatible", or open the page in Safari.</p>
-    </section>
+      <section class="side-block">
+        <h2>Video</h2>
+        <label class="drop" for="file">
+          <input type="file" id="file" accept="video/*">
+          <span class="drop-title" id="fileName">Choose a serve video</span>
+          <span class="drop-sub">One serve, side-on, whole body and toss in shot</span>
+        </label>
+      </section>
 
-    <section class="card">
-      <h2>2. Upload and describe</h2>
-      <label class="file">
-        <input type="file" id="file" accept="video/*">
-        <span>Choose a serve video</span>
-      </label>
-      <div class="grid">
-        <label>Hitting hand
+      <section class="side-block">
+        <h2>About this serve</h2>
+        <label class="field" for="hand">Hitting hand
           <select id="hand">
             <option value="auto">Detect automatically</option>
             <option value="right">Right-handed</option>
             <option value="left">Left-handed</option>
           </select>
         </label>
-        <label>Serve stance
+        <label class="field" for="stance">Stance
           <select id="stance">
             <option value="auto">Detect automatically</option>
             <option value="pinpoint">Pinpoint (back foot slides up)</option>
             <option value="platform">Platform (feet stay apart)</option>
           </select>
         </label>
-        <label>Clip speed
+        <label class="field" for="timeScale">Clip speed
           <select id="timeScale">
-            <option value="1">Real time (normal, or slow-mo file played at normal speed)</option>
+            <option value="1">Real time</option>
             <option value="4">Slowed down 4×</option>
             <option value="8">Slowed down 8×</option>
           </select>
         </label>
-        <label>Analysis detail
+        <label class="field" for="rate">Analysis detail
           <select id="rate">
-            <option value="30">30 frames per second (faster)</option>
-            <option value="60" selected>60 frames per second</option>
-            <option value="120">120 frames per second (slow, for slow-mo clips)</option>
+            <option value="30">30 frames/s · fastest</option>
+            <option value="60" selected>60 frames/s</option>
+            <option value="120">120 frames/s · slow-mo clips</option>
           </select>
         </label>
-      </div>
+      </section>
 
-      <fieldset>
-        <legend>What usually goes wrong with your serve? (tick any)</legend>
+      <section class="side-block">
+        <h2>What usually goes wrong?</h2>
         <div id="issues" class="issues"></div>
-      </fieldset>
+      </section>
 
-      <button id="analyse" disabled>Analyse serve</button>
-      <div id="progressWrap" class="progress hidden"><div id="progressBar"></div></div>
-      <p id="status" class="status"></p>
-    </section>
-
-    <section class="card hidden" id="viewer">
-      <h2>3. Your serve</h2>
-      <div class="stage">
-        <video id="video" playsinline muted></video>
-        <canvas id="overlay"></canvas>
+      <div class="side-actions">
+        <button type="button" id="analyse" class="primary" disabled>Analyse serve</button>
+        <div id="progressWrap" class="progress hidden"><div id="progressBar"></div></div>
+        <p id="status" class="status" aria-live="polite">Choose a video to start.</p>
       </div>
-      <div class="controls">
-        <button id="play">Play</button>
-        <button id="back">◀ Frame</button>
-        <button id="fwd">Frame ▶</button>
-        <select id="speed">
-          <option value="1">1×</option>
-          <option value="0.5">0.5×</option>
-          <option value="0.25" selected>0.25×</option>
-        </select>
-        <span class="jump">Jump to:
-          <button data-key="trophy">Trophy</button>
-          <button data-key="tossPeak">Toss peak</button>
-          <button data-key="contact">Contact</button>
-        </span>
-      </div>
-      <div class="toggles">
-        <label><input type="checkbox" id="showPose" checked> Skeleton</label>
-        <label><input type="checkbox" id="showBall" checked> Ball</label>
-        <label><input type="checkbox" id="showRacket" checked> Racquet</label>
-      </div>
-    </section>
 
-    <section class="card hidden" id="results">
-      <h2>4. Analysis</h2>
-      <div class="summary">
-        <div class="score"><span id="overall">–</span><small>serve score</small></div>
-        <div id="summaryText"></div>
+      <details class="tips">
+        <summary>How to film a good clip</summary>
+        <p>Put your phone on a tripod or fence, side-on, 4–6 metres away. Keep your whole body and the top of the toss in frame. Use slow motion (120 or 240 fps) if you can, and a plain background behind the toss so the ball is easy to spot.</p>
+        <p>If an iPhone video won't load, set Settings › Camera › Formats to "Most Compatible", or use Safari.</p>
+      </details>
+
+      <p class="side-foot">Analysis runs on your device. Videos are never uploaded.</p>
+    </aside>
+
+    <!-- RIGHT: video and dashboard -->
+    <main class="workspace">
+      <div class="banner" id="banner">
+        <b>Example results</b> from a computer-generated serve. Upload your own video on the left to replace them.
       </div>
-      <h3>Top things to work on</h3>
-      <ol id="feedback" class="feedback"></ol>
-      <h3>All measurements</h3>
-      <table>
-        <thead><tr><th>Measurement</th><th>You</th><th>Pro range</th><th>Score</th></tr></thead>
-        <tbody id="metricRows"></tbody>
-      </table>
-      <p class="hint" id="refNote"></p>
-      <button id="download" class="secondary">Download analysis (JSON)</button>
-    </section>
 
-    <section class="card hidden" id="historyCard">
-      <h2>Your past scans (saved in this browser)</h2>
-      <table>
-        <thead><tr><th>Date</th><th>Stance</th><th>Score</th></tr></thead>
-        <tbody id="historyRows"></tbody>
-      </table>
-    </section>
-  </main>
+      <div class="top">
+        <section class="panel video-panel" aria-label="Video">
+          <div class="stage">
+            <video id="video" playsinline muted class="hidden"></video>
+            <canvas id="overlay" width="560" height="640"></canvas>
+          </div>
+          <div class="timeline">
+            <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Position in clip">
+            <div class="ticks" id="ticks"></div>
+          </div>
+          <div class="controls">
+            <button type="button" id="play" class="ctrl">Play</button>
+            <button type="button" id="back" class="ctrl" aria-label="Previous frame">◀</button>
+            <button type="button" id="fwd" class="ctrl" aria-label="Next frame">▶</button>
+            <select id="speed" aria-label="Playback speed">
+              <option value="1">1×</option>
+              <option value="0.5">0.5×</option>
+              <option value="0.25" selected>0.25×</option>
+            </select>
+            <span class="time" id="time">0.00 s</span>
+            <span class="layers">
+              <label><input type="checkbox" id="showPose" checked> Skeleton</label>
+              <label><input type="checkbox" id="showBall" checked> Ball</label>
+              <label><input type="checkbox" id="showRacket" checked> Racquet</label>
+            </span>
+          </div>
+        </section>
 
-  <footer>
-    Serve Coach v0.1 · Analysis runs on your device; videos are not uploaded. · Scores are a practice guide, not a coach's verdict.
-  </footer>
+        <section class="panel summary-panel" id="summary" aria-label="Summary"></section>
+      </div>
+
+      <section aria-label="Serve phases">
+        <div class="section-head">
+          <h2>Breakdown by phase</h2>
+          <p class="legend"><span class="band-key"></span> Pro range <span class="dot good"></span> In range <span class="dot close"></span> Close <span class="dot work"></span> Work on</p>
+        </div>
+        <div class="phases" id="phases"></div>
+      </section>
+
+      <section class="panel history-panel" aria-label="Progress">
+        <div class="section-head">
+          <h2>Progress over time</h2>
+          <button type="button" id="download" class="ghost">Download analysis (JSON)</button>
+        </div>
+        <div id="history"></div>
+        <p class="footnote" id="refNote"></p>
+      </section>
+    </main>
+  </div>
 
   <script type="module" src="js/app.js"></script>
 </body>

@@ -7,3 +7,4 @@
 *.webm
 .DS_Store
 node_modules/
+preview.html
