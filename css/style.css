@@ -63,6 +63,8 @@ button, select, input { font: inherit; }
 .drop-title { font-weight: 600; overflow-wrap: anywhere; }
 .drop-sub { font-size: 13px; color: var(--side-muted); }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--side-muted); }
+.sidebar input[type=number] { background: #1c3550; color: var(--side-ink); border: 1px solid var(--side-line); border-radius: 8px; padding: 8px 10px; }
+.field-note { font-size: 12px; color: var(--side-muted); opacity: 0.85; }
 .sidebar select { background: #1c3550; color: var(--side-ink); border: 1px solid var(--side-line); border-radius: 8px; padding: 8px 10px; }
 .issues { display: flex; flex-wrap: wrap; gap: 6px; }
 .issue { position: relative; }

@@ -4,10 +4,16 @@
 
 import { METRICS, PHASES } from './analysis.js';
 
-export function fmt(value, unit) {
+// Formats a measurement. Distances are stored in player heights (H); if we know the player's
+// real height, show them in centimetres or metres instead.
+export function fmt(value, unit, heightCm) {
   if (value === null || value === undefined || !Number.isFinite(value)) return '–';
   if (unit === '°') return `${value.toFixed(0)}°`;
   if (unit === 's') return `${value.toFixed(2)} s`;
+  if (heightCm) {
+    const cm = value * heightCm;
+    return Math.abs(cm) >= 100 ? `${(cm / 100).toFixed(2)} m` : `${Math.round(cm)} cm`;
+  }
   return `${value.toFixed(2)} H`;
 }
 
@@ -59,7 +65,7 @@ export function renderSummary(el, r) {
 }
 
 // ---------- phase cards with gauges ----------
-function gauge(row) {
+function gauge(row, hc) {
   const [min, max] = row.def.scale;
   const pct = (v) => Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100));
   if (row.status === 'missing') {
@@ -67,13 +73,13 @@ function gauge(row) {
   }
   const left = pct(row.lo), right = pct(row.hi);
   return `
-    <div class="gauge" role="img" aria-label="${esc(row.def.label)}: you ${fmt(row.value, row.def.unit)}, pro range ${fmt(row.lo, row.def.unit)} to ${fmt(row.hi, row.def.unit)}">
+    <div class="gauge" role="img" aria-label="${esc(row.def.label)}: you ${fmt(row.value, row.def.unit, hc)}, pro range ${fmt(row.lo, row.def.unit, hc)} to ${fmt(row.hi, row.def.unit, hc)}">
       <div class="band" style="left:${left}%;width:${Math.max(1, right - left)}%"></div>
       <div class="marker ${statusOf(row.score)}" style="left:${pct(row.value)}%"></div>
     </div>`;
 }
 
-export function renderPhases(el, comparison) {
+export function renderPhases(el, comparison, heightCm) {
   const byPhase = {};
   for (const row of comparison.rows) (byPhase[row.def.phase] ||= []).push(row);
   el.innerHTML = Object.entries(PHASES).map(([key, phase], i) => {
@@ -94,10 +100,10 @@ export function renderPhases(el, comparison) {
         </header>
         ${rows.map((row) => `
           <div class="metric">
-            <div class="metric-head"><span>${esc(row.def.label)}</span><b>${fmt(row.value, row.def.unit)}</b></div>
-            ${gauge(row)}
+            <div class="metric-head"><span>${esc(row.def.label)}</span><b>${fmt(row.value, row.def.unit, heightCm)}</b></div>
+            ${gauge(row, heightCm)}
             <div class="metric-foot">
-              <span>${row.status === 'missing' ? '' : `Pro ${fmt(row.lo, row.def.unit)} – ${fmt(row.hi, row.def.unit)}`}</span>
+              <span>${row.status === 'missing' ? '' : `Pro ${fmt(row.lo, row.def.unit, heightCm)} – ${fmt(row.hi, row.def.unit, heightCm)}`}</span>
               <span class="word ${statusOf(row.score)}">${STATUS_WORD[statusOf(row.score)]}</span>
             </div>
           </div>`).join('')}

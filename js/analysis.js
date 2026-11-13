@@ -61,7 +61,7 @@ export const METRICS = {
   shoulderTilt:  { phase: 'trophy', scale: [-10, 50], label: 'Shoulder tilt at trophy', unit: '°', tol: 7, weight: 1.0,
                    low: 'Tilt your shoulders more at the trophy position — tossing shoulder up, hitting shoulder down — to help you hit up to the ball.',
                    high: 'Your shoulders are tilting a lot; this can pull the toss behind you. Aim for a slightly flatter tilt.' },
-  tossHeight:    { phase: 'toss', scale: [-0.2, 0.7], label: 'Toss peak above contact', unit: 'H', tol: 0.1, weight: 1.0,
+  tossHeight:    { phase: 'toss', scale: [-0.2, 0.7], label: 'Toss peak above contact point', unit: 'H', tol: 0.1, weight: 1.0,
                    low: 'Your toss is low, so you are rushing. Toss a little higher so the ball peaks just above where you hit it.',
                    high: 'Your toss is going quite high, so the ball is falling fast at contact. Toss a bit lower for better timing.' },
   tossPlacement: { phase: 'toss', scale: [-0.3, 0.8], label: 'Toss in front of front foot', unit: 'H', tol: 0.12, weight: 1.3,
@@ -70,13 +70,13 @@ export const METRICS = {
   racquetDrop:   { phase: 'contact', scale: [-0.2, 0.4], label: 'Racquet drop below shoulder', unit: 'H', tol: 0.08, weight: 0.8,
                    low: 'The racquet is not dropping far down your back. Relax your arm so the racquet falls lower before swinging up.',
                    high: 'Your racquet drop is very deep; that is not usually a problem, but check it is not slowing your swing.' },
-  contactHeight: { phase: 'contact', scale: [1.0, 1.8], label: 'Contact height', unit: 'H', tol: 0.08, weight: 1.3,
+  contactHeight: { phase: 'contact', scale: [1.0, 1.8], label: 'Contact height above ground', unit: 'H', tol: 0.08, weight: 1.3,
                    low: 'You are hitting the ball low. Reach up fully and hit at the top of your reach — low contact is a common reason serves go into the net.',
                    high: 'Your contact point is very high — great reach. Make sure you are not waiting for the ball to drop.' },
   armExtension:  { phase: 'contact', scale: [120, 180], label: 'Hitting arm straightness at contact', unit: '°', tol: 10, weight: 1.0,
                    low: 'Your arm is bent at contact. Hit up with a straight arm at full stretch.',
                    high: 'Good full extension at contact.' },
-  jump:          { phase: 'finish', scale: [0, 0.3], label: 'Feet off ground at contact', unit: 'H', tol: 0.05, weight: 0.7,
+  jump:          { phase: 'finish', scale: [0, 0.3], label: 'Jump height (feet off ground)', unit: 'H', tol: 0.05, weight: 0.7,
                    low: 'You are staying on the ground. Let your leg drive lift you up into the ball.',
                    high: 'Big jump — make sure you stay balanced and land well.' },
   legDriveLead:  { phase: 'finish', scale: [0, 0.5], label: 'Leg drive before contact', unit: 's', tol: 0.08, weight: 1.0,
@@ -146,9 +146,24 @@ export function analyseServe(rawFrames, options = {}) {
   }
   const contact = frames[contactIdx];
 
-  // 4. Trophy position = when the tossing arm is highest, before contact.
-  let trophyIdx = 0;
-  for (let i = 0; i < contactIdx; i++) if (P(frames[i], S.tW).y < P(frames[trophyIdx], S.tW).y) trophyIdx = i;
+  // 4. Trophy position. Coaches and sports scientists usually take this as the moment of
+  //    deepest knee bend, with the tossing arm up and the hitting elbow raised to about
+  //    shoulder height. We look between the toss arm passing shoulder height and contact.
+  const kneeBend = (f) => ((180 - angleAt(P(f, J.lHip), P(f, J.lKnee), P(f, J.lAnkle))) +
+                           (180 - angleAt(P(f, J.rHip), P(f, J.rKnee), P(f, J.rAnkle)))) / 2;
+  let tossUpIdx = 0;
+  while (tossUpIdx < contactIdx && P(frames[tossUpIdx], S.tW).y > P(frames[tossUpIdx], S.tS).y) tossUpIdx++;
+  if (tossUpIdx >= contactIdx) tossUpIdx = 0;
+  const elbowUp = (f) => P(f, S.hE).y < P(f, S.hS).y + 0.1 * H;
+  let trophyIdx = -1;
+  for (const needElbow of [true, false]) {
+    for (let i = tossUpIdx; i < contactIdx; i++) {
+      if (needElbow && !elbowUp(frames[i])) continue;
+      if (trophyIdx < 0 || kneeBend(frames[i]) > kneeBend(frames[trophyIdx])) trophyIdx = i;
+    }
+    if (trophyIdx >= 0) break;
+  }
+  if (trophyIdx < 0) trophyIdx = Math.max(0, contactIdx - 1);
   const trophy = frames[trophyIdx];
 
   // 5. Which way is the court? The player moves towards it during the serve.
@@ -185,7 +200,10 @@ export function analyseServe(rawFrames, options = {}) {
     : (groundY - P(contact, S.hW).y) / H + 0.25; // wrist is roughly 0.25 H below the ball at contact
   m.contactSource = contactPoint ? 'ball' : 'wrist estimate';
   m.armExtension = angleAt(P(contact, S.hS), P(contact, S.hE), P(contact, S.hW));
-  m.jump = Math.max(0, (groundY - Math.max(P(contact, J.lAnkle).y, P(contact, J.rAnkle).y)) / H);
+  // Jump: highest the lower foot gets off the ground, around contact (±0.15 s of real time)
+  const win = 0.15 * timeScale;
+  m.jump = Math.max(0, ...frames.filter((f) => Math.abs(f.t - contact.t) <= win)
+    .map((f) => (groundY - Math.max(P(f, J.lAnkle).y, P(f, J.rAnkle).y)) / H));
 
   // Toss: highest ball position above the head before contact
   const headY = (f) => P(f, J.nose).y;
@@ -229,6 +247,7 @@ export function analyseServe(rawFrames, options = {}) {
     version: 'analysis-0.1',
     hand, stance, detectedStance, dir,
     playerHeightPx: H,
+    playerHeightCm: options.heightCm || null,
     keyFrames: { trophy: trophy.t, contact: contact.t, tossPeak: peak ? peak.f.t : null },
     framesWithPlayer: n,
     framesWithBall: frames.filter((f) => f.ball).length,

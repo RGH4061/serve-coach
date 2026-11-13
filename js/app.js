@@ -15,6 +15,7 @@ const wctx = work.getContext('2d', { willReadFrequently: true });
 
 let refs = null;        // professional reference numbers (data/pros.json)
 let lastResult = null;  // the latest real analysis
+let shown = null;       // whichever result is on screen (example or real)
 const isPreview = Boolean(window.__PREVIEW);
 
 const viewer = createViewer({
@@ -30,6 +31,21 @@ for (const [key, issue] of Object.entries(ISSUES)) {
   label.innerHTML = `<input type="checkbox" id="issue-${key}" value="${key}"><span>${issue.label}</span>`;
   $('issues').appendChild(label);
 }
+// Player height: optional, remembered in this browser, used to show real distances.
+const heightCm = () => {
+  const v = Number($('heightCm').value);
+  return v >= 100 && v <= 230 ? v : null;
+};
+try { $('heightCm').value = localStorage.getItem('playerHeightCm') || ''; } catch { /* ignore */ }
+$('heightCm').addEventListener('input', () => {
+  try { localStorage.setItem('playerHeightCm', $('heightCm').value); } catch { /* ignore */ }
+  if (shown) {
+    shown.playerHeightCm = heightCm();
+    renderPhases($('phases'), shown.comparison, heightCm());
+  }
+  setRefNote();
+});
+
 const ticked = () => [...document.querySelectorAll('#issues input:checked')].map((i) => i.value);
 
 // ---------- example dashboard (shown until a real video is analysed) ----------
@@ -42,8 +58,9 @@ function showExample() {
   Object.assign(r.metrics, { kneeFlex: 41, contactHeight: 1.41, tossPlacement: 0.58, armExtension: 157, landing: 0.33 });
   r.comparison = compareToPros(r, refs);
   r.feedback = buildFeedback(r.comparison, ['net']);
+  shown = r;
   renderSummary($('summary'), r);
-  renderPhases($('phases'), r.comparison);
+  renderPhases($('phases'), r.comparison, heightCm());
   const weeks = [52, 57, 55, 63, r.comparison.overall];
   renderHistory($('history'), weeks.map((overall, i) => ({ overall, date: Date.now() - (weeks.length - 1 - i) * 7 * 864e5 })));
   viewer.set({ mode: 'example', frames, keyFrames: r.keyFrames, width: 560, height: 640, duration: frames[frames.length - 1].t, step: 1 / FPS });
@@ -52,7 +69,7 @@ function showExample() {
 
 function setRefNote() {
   const placeholder = refs.pros.some((p) => p.source === 'placeholder');
-  $('refNote').textContent = 'H = player height (1.00 H is your full height). Scoring score-0.1.' +
+  $('refNote').textContent = (heightCm() ? `Distances use a player height of ${heightCm()} cm.` : 'H = player height (1.00 H is full height). Enter a height on the left to see cm and metres.') + ' Scoring score-0.1.' +
     (placeholder ? ' Pro A and Pro B are placeholder estimates until real pro footage is processed.' : '');
 }
 
@@ -88,14 +105,14 @@ $('analyse').addEventListener('click', async () => {
     const det = await getDetectors();
     await det.loadModels(setStatus);
     const frames = await processVideo(det);
-    const r = analyseServe(frames, { hand: $('hand').value, stance: $('stance').value, timeScale: Number($('timeScale').value) });
+    const r = analyseServe(frames, { hand: $('hand').value, stance: $('stance').value, timeScale: Number($('timeScale').value), heightCm: heightCm() });
     r.issues = ticked();
     r.comparison = compareToPros(r, refs);
     r.feedback = buildFeedback(r.comparison, r.issues);
     r.date = new Date().toISOString();
-    lastResult = r;
+    lastResult = shown = r;
     renderSummary($('summary'), r);
-    renderPhases($('phases'), r.comparison);
+    renderPhases($('phases'), r.comparison, heightCm());
     saveHistory(r);
     viewer.set({ mode: 'live', frames, keyFrames: r.keyFrames, width: work.width, height: work.height, duration: video.duration, step: 1 / Number($('rate').value) });
     $('banner').classList.add('hidden');
