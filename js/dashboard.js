@@ -27,7 +27,7 @@ export function renderSummary(el, r) {
   const score = c.overall ?? 0;
   const circ = 2 * Math.PI * 52;
   const state = statusOf(c.overall);
-  const stanceNote = r.stance === r.detectedStance ? 'detected' : `chosen · detected ${r.detectedStance}`;
+  const stanceNote = r.stance !== r.detectedStance ? `chosen · detected ${r.detectedStance}` : r.stanceUnsure ? 'detected · hard to tell from this angle, set it on the left' : 'detected';
   const quality = [
     ['Player', r.framesWithPlayer, r.framesWithPlayer >= 20],
     ['Ball', r.framesWithBall, r.framesWithBall >= 5],

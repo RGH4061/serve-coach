@@ -293,6 +293,8 @@ export function analyseServe(rawFrames, options = {}) {
   return {
     version: 'analysis-0.3',
     hand, stance, detectedStance, dir, view, timeScale,
+    // The back foot sliding up only shows clearly side-on, so treat the detected stance as a guess otherwise.
+    stanceUnsure: view !== 'side' && (!options.stance || options.stance === 'auto'),
     playerHeightPx: H,
     groundY,
     anchorX: mid(P(trophy, J.lAnkle), P(trophy, J.rAnkle)).x,
