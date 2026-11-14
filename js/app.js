@@ -5,7 +5,7 @@
 
 import { analyseServe, compareToPros, buildFeedback, ISSUES, exportMotion, pickPro } from './analysis.js';
 import { createComparison } from './compare.js';
-import { processVideo } from './pipeline.js';
+import { processVideo, loadVideoFile, workSize, isPhone } from './pipeline.js';
 import { renderSummary, renderPhases, renderHistory } from './dashboard.js';
 import { createViewer } from './viewer.js';
 import { makeServe, FPS } from './synthetic.js';
@@ -157,22 +157,26 @@ $('file').addEventListener('change', () => {
   const file = $('file').files[0];
   if (!file) return;
   $('fileName').textContent = file.name;
-  video.src = URL.createObjectURL(file);
-  video.onloadedmetadata = () => {
-    // Work at up to 1280 px on the long side: enough detail, but not too slow.
-    const s = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
-    work.width = Math.round(video.videoWidth * s);
-    work.height = Math.round(video.videoHeight * s);
-    viewer.set({ mode: 'live', width: work.width, height: work.height, duration: video.duration, step: 1 / Number($('rate').value) });
-    $('banner').innerHTML = '<b>Video loaded.</b> Trim it to the serve under the video, check the options on the left, then press Analyse serve.';
-    $('trimTools').classList.remove('hidden');
-    $('comparePanel').classList.add('hidden');
-    setTrim(null);
-    viewer.seek(0);
-    $('analyse').disabled = false;
-    setStatus(`${video.duration.toFixed(1)} s clip, ${video.videoWidth}×${video.videoHeight}.`);
-  };
-  video.onerror = () => setStatus('This browser can\'t play that video format. On iPhone use "Most Compatible", or try Safari.');
+  setStatus('Opening the video…');
+  loadVideoFile(video, file, {
+    onError: setStatus,
+    onReady: () => {
+      // Work at up to 1280 px on the long side: enough detail, but not too slow.
+      const s = Math.min(1, workSize() / Math.max(video.videoWidth, video.videoHeight));
+      work.width = Math.round(video.videoWidth * s);
+      work.height = Math.round(video.videoHeight * s);
+      viewer.set({ mode: 'live', width: work.width, height: work.height, duration: video.duration, step: 1 / Number($('rate').value) });
+      $('banner').innerHTML = '<b>Video loaded.</b> Trim it to the serve under the video, check the options, then press Analyse serve.';
+      $('trimTools').classList.remove('hidden');
+      $('comparePanel').classList.add('hidden');
+      setTrim(null);
+      viewer.seek(0);
+      $('analyse').disabled = false;
+      setStatus(`${video.duration.toFixed(1)} s clip, ${video.videoWidth}×${video.videoHeight}.`);
+      // On a phone the video panel is below the options, so bring it into view for trimming.
+      if (isPhone()) document.querySelector('.video-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+  });
 });
 
 // ---------- running the analysis ----------
@@ -213,6 +217,7 @@ $('analyse').addEventListener('click', async () => {
     viewer.setTrim(trim);
     $('banner').classList.add('hidden');
     setStatus('Done. Click the markers under the video to check each key moment.');
+    if (isPhone()) $('summary').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) {
     console.error(err);
     setStatus(err.message);
@@ -245,9 +250,18 @@ function saveHistory(r) {
   renderHistory($('history'), h);
 }
 
-function setStatus(msg) { $('status').textContent = msg; }
+function setStatus(msg) { $('status').textContent = msg; $('status2').textContent = msg; }
+// Show unexpected errors on the page, so problems on phones (where there's no console) are visible.
+window.addEventListener('error', (e) => setStatus(`Error: ${e.message}`));
+window.addEventListener('unhandledrejection', (e) => setStatus(`Error: ${e.reason && e.reason.message ? e.reason.message : e.reason}`));
+
+// Phone-only copy of the Analyse button next to the trim controls, kept in step with the main one.
+$('analyse2').addEventListener('click', () => $('analyse').click());
+new MutationObserver(() => { $('analyse2').disabled = $('analyse').disabled; })
+  .observe($('analyse'), { attributes: true, attributeFilter: ['disabled'] });
 
 // ---------- start ----------
+if (isPhone()) $('rate').value = '30'; // phones are slower; 30 frames/s keeps analysis to a reasonable time
 (async () => {
   refs = window.__PROS || await fetch('data/pros.json').then((r) => r.json());
   showExample();

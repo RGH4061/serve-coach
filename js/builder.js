@@ -6,7 +6,7 @@
 import { analyseServe, exportMotion, averageServes, upsertPro, METRICS, PHASES } from './analysis.js';
 import { fmt } from './dashboard.js';
 import { createViewer } from './viewer.js';
-import { processVideo } from './pipeline.js';
+import { processVideo, loadVideoFile, workSize, isPhone } from './pipeline.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('video');
@@ -45,21 +45,23 @@ $('file').addEventListener('change', () => {
   const file = $('file').files[0];
   if (!file) return;
   $('fileName').textContent = file.name;
-  video.src = URL.createObjectURL(file);
-  video.onloadedmetadata = () => {
-    const s = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
-    work.width = Math.round(video.videoWidth * s);
-    work.height = Math.round(video.videoHeight * s);
-    frames = null; current = null; manual = {};
-    viewer.set({ mode: 'live', width: work.width, height: work.height, duration: video.duration, step: 1 / Number($('rate').value) });
-    setTrim(null);
-    $('trimTools').classList.remove('hidden');
-    $('keyTools').classList.add('hidden');
-    $('reviewPanel').classList.add('hidden');
-    $('analyse').disabled = false;
-    setStatus(`${video.duration.toFixed(1)} s clip. Trim it to one serve, then analyse.`);
-  };
-  video.onerror = () => setStatus('This browser can\'t play that video. On iPhone use "Most Compatible", or try Safari.');
+  setStatus('Opening the video…');
+  loadVideoFile(video, file, {
+    onError: setStatus,
+    onReady: () => {
+      const s = Math.min(1, workSize() / Math.max(video.videoWidth, video.videoHeight));
+      work.width = Math.round(video.videoWidth * s);
+      work.height = Math.round(video.videoHeight * s);
+      frames = null; current = null; manual = {};
+      viewer.set({ mode: 'live', width: work.width, height: work.height, duration: video.duration, step: 1 / Number($('rate').value) });
+      setTrim(null);
+      $('trimTools').classList.remove('hidden');
+      $('keyTools').classList.add('hidden');
+      $('reviewPanel').classList.add('hidden');
+      $('analyse').disabled = false;
+      setStatus(`${video.duration.toFixed(1)} s clip. Trim it to one serve, then analyse.`);
+    },
+  });
 });
 
 function setTrim(next) {
