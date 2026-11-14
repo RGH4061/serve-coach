@@ -73,7 +73,7 @@ async function showComparison(r, motion) {
     <ul>
       <li>Both figures are scaled to the same height, so you compare shape and timing, not size.</li>
       <li>They are lined up on the trophy and contact moments, so a slower serve still matches up.</li>
-      <li>Hitting arm is shown in blue. Use the timeline or Play above to move both together.</li>
+      <li>Hitting arm is shown in orange. Use the timeline or Play above to move both together.</li>
     </ul>`;
   $('comparePanel').classList.remove('hidden');
 }

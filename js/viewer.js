@@ -27,11 +27,13 @@ export function createViewer(els) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (s.mode === 'example') {
       // Simple court backdrop for the example stick figure
-      ctx.fillStyle = '#21405f';
+      const g = ctx.createLinearGradient(0, 0, canvas.width * 0.6, canvas.height);
+      g.addColorStop(0, '#0c0a08'); g.addColorStop(0.55, '#2a1d14'); g.addColorStop(1, '#0c0a08');
+      ctx.fillStyle = g;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#2f5d86';
+      ctx.fillStyle = '#9a5428';
       ctx.fillRect(0, canvas.height * 0.94, canvas.width, canvas.height * 0.06);
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.strokeStyle = 'rgba(244,235,224,0.9)';
       ctx.lineWidth = 4;
       ctx.beginPath(); ctx.moveTo(0, canvas.height * 0.94); ctx.lineTo(canvas.width, canvas.height * 0.94); ctx.stroke();
     }
@@ -45,29 +47,29 @@ export function createViewer(els) {
         if (!f.pose[a] || !f.pose[b]) continue;
         ctx.beginPath(); ctx.moveTo(f.pose[a].x, f.pose[a].y); ctx.lineTo(f.pose[b].x, f.pose[b].y); ctx.stroke();
       }
-      ctx.fillStyle = '#4da3ff';
+      ctx.fillStyle = '#e07a35';
       for (const p of f.pose.slice(11, 29)) { ctx.beginPath(); ctx.arc(p.x, p.y, lw * 1.6, 0, 7); ctx.fill(); }
       ctx.beginPath(); ctx.arc(f.pose[0].x, f.pose[0].y, lw * 4, 0, 7); ctx.stroke();
     }
     if (showRacket.checked && f.racket) {
       const r = f.racket;
-      ctx.strokeStyle = '#ff9f43';
+      ctx.strokeStyle = '#e9c18c';
       ctx.lineWidth = lw;
       ctx.strokeRect(r.x - r.w / 2, r.y - r.h / 2, r.w, r.h);
     }
     if (showBall.checked) {
-      ctx.fillStyle = 'rgba(223,255,79,0.55)';
+      ctx.fillStyle = 'rgba(219,230,92,0.55)';
       s.frames.filter((g) => g.ball && g.t <= f.t && g.t > f.t - 0.6)
         .forEach((g) => { ctx.beginPath(); ctx.arc(g.ball.x, g.ball.y, lw * 2, 0, 7); ctx.fill(); });
       if (f.ball) {
-        ctx.fillStyle = '#dfff4f';
+        ctx.fillStyle = '#dbe65c';
         ctx.beginPath(); ctx.arc(f.ball.x, f.ball.y, Math.max(f.ball.w / 2, lw * 3), 0, 7); ctx.fill();
       }
     }
     const hit = KEYS.find(([k]) => s.keyFrames[k] !== null && s.keyFrames[k] !== undefined && Math.abs(s.keyFrames[k] - f.t) < s.step * 0.75);
     if (hit) {
-      ctx.font = `600 ${Math.round(canvas.height / 20)}px "Barlow Condensed", system-ui, sans-serif`;
-      ctx.fillStyle = '#dfff4f';
+      ctx.font = `600 ${Math.round(canvas.height / 20)}px -apple-system, BlinkMacSystemFont, system-ui, sans-serif`;
+      ctx.fillStyle = '#dbe65c';
       ctx.fillText(hit[1].toUpperCase(), canvas.width * 0.03, canvas.height * 0.08);
     }
   }
