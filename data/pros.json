@@ -62,6 +62,29 @@
         "tossHeight": 0.165,
         "legDriveLead": 0.117
       }
+    },
+    {
+      "id": "Pro D",
+      "stance": "platform",
+      "hand": "right",
+      "view": "side",
+      "heightCm": 185,
+      "source": "footage",
+      "analysisVersion": "analysis-0.3",
+      "motion": "data/pros/pro-d.json",
+      "metrics": {
+        "trophyElbow": 89.66,
+        "shoulderTilt": 22.872,
+        "contactHeight": 1.399,
+        "armExtension": 172.345,
+        "jump": 0.115,
+        "legDriveLead": 0.233,
+        "landing": 0.278,
+        "racquetDrop": 0.147
+      },
+      "level": "tour",
+      "serves": 1,
+      "notes": "Side-on clip slowed ~8x (worked out from the toss falling under gravity). Knee bend left out: read as 22 deg, likely under-read. Toss height not measured (top of toss out of shot)."
     }
   ]
 }

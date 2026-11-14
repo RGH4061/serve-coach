@@ -1,6 +1,6 @@
 # Serve Coach: accuracy roadmap
 
-Last updated: 13 November 2026 (analysis-0.3)
+Last updated: 14 November 2026 (analysis-0.3)
 
 This document lists where the measurements go wrong today, what each fix would cost, and the order to do them in. It is based on testing with a real professional serve: a 120 fps iPhone clip of a doubles pro, filmed front-on.
 
@@ -16,6 +16,8 @@ The first run scored the pro 75/100. Every point lost came from a measuring bug,
 | Trophy marked too early or late | Used "tossing arm highest" | Fixed: deepest knee bend with the toss arm up and the hitting elbow raised |
 
 Detection rates on that clip: player 100% of frames, ball 25%, racquet 63%. The racquet was never detected at the bottom of the drop, because it was too blurred.
+
+A slow-motion side-on clip of a tour pro (Pro D) scored 65 at first. The clip speed had been set to 4× when it was really about 8×, and the top of the toss was out of shot. Toss height is now left blank when the ball isn't seen both rising into and falling from its peak. Knee bend read only 22° and was left out of his reference until it has been checked by eye.
 
 ## Where error comes from, biggest first
 
@@ -34,6 +36,7 @@ Effort: S = an afternoon, M = a few days, L = a week or more. Impact is on score
 
 - **Confidence per measurement.** Show "low confidence" and leave it out of the score when the needed object was barely seen (for example, ball in fewer than 5 frames near the toss peak). Stops one bad detection from costing 20 points.
 - **Auto-detect camera angle.** Shoulder width compared with torso length at set-up tells side-on from front-on. Pre-fill the option and warn when it doesn't match what the user picked.
+- **Work out slow-motion speed from the toss.** A tossed ball falls under gravity at 9.81 m/s², so with the player's height for scale, fitting a curve to the rising toss gives the slow-motion factor. On the Pro D clip it gave 8.6× from 85 ball positions, fitting to within 2 pixels. Pre-fill the clip speed with it and warn when the chosen value disagrees, since a wrong clip speed breaks every timing measurement.
 - **Auto-suggest trim.** Find the serve from the hitting-wrist peak and motion energy, then pre-set the trim handles. Users only adjust it.
 - **Analyse every frame near key moments.** Do a quick 30 fps pass to find the serve, then a full-frame-rate pass (120/240 fps) from trophy to landing. Faster overall and sharper timing.
 - **Better smoothing.** Replace the 3-frame average with a One-Euro or Savitzky–Golay filter, skip joints with low visibility, and fill short gaps.
