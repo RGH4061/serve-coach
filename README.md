@@ -31,6 +31,8 @@ Measurements use **H** (the player's height) as the unit, so players of differen
 | `js/compare.js` | "You vs Pro" stick-figure panel |
 | `js/synthetic.js` | Computer-generated example serve (tests and example dashboard) |
 | `data/pros/` | Recorded pro movements for the side-by-side |
+| `builder.html`, `js/builder.js` | Reference builder for adding pros |
+| `js/pipeline.js` | Steps through a video running the detectors (shared by both pages) |
 | `tools/add-pro.mjs` | Adds a pro reference from a downloaded analysis file |
 | `docs/accuracy-roadmap.md` | Known error sources and planned accuracy improvements |
 | `data/pros.json` | Professional reference numbers (Pro A, Pro B, …) |
@@ -39,13 +41,14 @@ Measurements use **H** (the player's height) as the unit, so players of differen
 
 ## Professional references
 
-Pros are stored anonymously as Pro A, Pro B and so on, grouped by stance. The current values are **placeholder estimates**. To add a real reference:
+Pros are stored anonymously as Pro A, Pro B and so on, grouped by stance. The current values are **placeholder estimates**. To add a real reference, use the **reference builder** at `/builder.html` (not linked from the main page):
 
-1. Run the pro's serve through the page (set the camera angle and the pro's height).
-2. Click **Download analysis (JSON)**.
-3. Run `node tools/add-pro.mjs serve-analysis.json "Pro D" --height 185 --view side`, then commit and push.
+1. Enter the pro's alias, height, camera angle and level.
+2. For each of 3–5 serves: choose the clip, trim it, analyse, check the trophy, toss-peak and contact markers (fix any with the "… is here" buttons), untick any measurement that looks wrong, then add the serve.
+3. Pick which serve to use for the stick figure, then click **Download updated pros.json**.
+4. Replace `data/pros.json` in your local repo with the downloaded file, then commit and push in GitHub Desktop.
 
-Pros added this way also appear in the "You vs Pro" side-by-side, matched by stance, camera angle, hitting hand and height.
+The builder uses exactly the same measuring code as the main page, so users and pros are always measured the same way. The command-line route (`node tools/add-pro.mjs`) still works for a single downloaded analysis.
 
 Only numbers go in this repo. Video files are blocked by `.gitignore`. Renaming a pro does not change who owns the footage, so check the rights before any public or commercial launch.
 

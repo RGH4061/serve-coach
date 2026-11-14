@@ -1,7 +1,7 @@
 // Tests the serve analysis on a made-up (synthetic) serve where we know the right answers.
 // Run with:  node tests/analysis.test.mjs
 import { readFileSync } from 'node:fs';
-import { analyseServe, compareToPros, buildFeedback, exportMotion, pickPro, alignTime, normaliseFrame, motionFrameAt } from '../js/analysis.js';
+import { analyseServe, compareToPros, buildFeedback, averageServes, upsertPro, exportMotion, pickPro, alignTime, normaliseFrame, motionFrameAt } from '../js/analysis.js';
 import { makeServe, H, G, FPS } from '../js/synthetic.js';
 
 let failures = 0;
@@ -76,6 +76,18 @@ check('pickPro: left-hander gets left-handed pro', pickPro(lib, { stance: 'pinpo
 check('pickPro: ignores pros without movement data', pickPro({ pros: [lib.pros[4]] }, { stance: 'pinpoint', hand: 'right' }) === null);
 const front = analyseServe(makeServe(), { view: 'front' });
 check('front-on view drops side-only measurements', !('tossPlacement' in front.metrics) && !('landing' in front.metrics));
+
+// Reference builder helpers
+const fixed = analyseServe(makeServe(), { keyFrames: { trophy: 0.8, contact: 1.25 } });
+check('manual key moments are used', near(fixed.keyFrames.trophy, 0.8, 0.01) && near(fixed.keyFrames.contact, 1.25, 0.01), JSON.stringify(fixed.keyFrames));
+check('manual key moments are reported', fixed.manualKeyFrames.join(',') === 'contact,trophy' || fixed.manualKeyFrames.join(',') === 'trophy,contact', fixed.manualKeyFrames.join(','));
+const avg = averageServes([
+  { result: { metrics: { kneeFlex: 60, jump: 0.1 } }, keep: { kneeFlex: true, jump: true } },
+  { result: { metrics: { kneeFlex: 70, jump: 0.5 } }, keep: { kneeFlex: true, jump: false } },
+]);
+check('averageServes uses only kept values', avg.kneeFlex === 65 && avg.jump === 0.1, JSON.stringify(avg));
+const up = upsertPro({ pros: [{ id: 'Pro A', x: 1 }, { id: 'Pro D', x: 1 }] }, { id: 'Pro D', x: 2 });
+check('upsertPro replaces same id', up.pros.length === 2 && up.pros.find((p) => p.id === 'Pro D').x === 2);
 
 console.log(failures ? `\n${failures} test(s) failed` : '\nAll tests passed');
 process.exit(failures ? 1 : 0);

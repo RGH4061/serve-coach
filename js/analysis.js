@@ -147,10 +147,14 @@ export function analyseServe(rawFrames, options = {}) {
     : { hS: J.lShoulder, hE: J.lElbow, hW: J.lWrist, tS: J.rShoulder, tW: J.rWrist };
 
   // 3. Contact = when the hitting wrist is at its highest. Refine with the ball if seen nearby.
+  // Key moments can be set by hand (options.keyFrames, in seconds), e.g. in the reference builder.
+  const manual = options.keyFrames || {};
+  const nearestIdx = (t) => frames.reduce((bi, f, i) => (Math.abs(f.t - t) < Math.abs(frames[bi].t - t) ? i : bi), 0);
   let contactIdx = 0;
   frames.forEach((f, i) => { if (P(f, S.hW).y < P(frames[contactIdx], S.hW).y) contactIdx = i; });
   let best = Infinity;
-  for (let i = Math.max(0, contactIdx - 3); i <= Math.min(n - 1, contactIdx + 3); i++) {
+  if (Number.isFinite(manual.contact)) { contactIdx = nearestIdx(manual.contact); best = -1; }
+  for (let i = Math.max(0, contactIdx - 3); best >= 0 && i <= Math.min(n - 1, contactIdx + 3); i++) {
     const b = frames[i].ball;
     if (!b) continue;
     const d = dist(b, P(frames[i], S.hW));
@@ -176,6 +180,7 @@ export function analyseServe(rawFrames, options = {}) {
     if (trophyIdx >= 0) break;
   }
   if (trophyIdx < 0) trophyIdx = Math.max(0, contactIdx - 1);
+  if (Number.isFinite(manual.trophy)) trophyIdx = Math.min(nearestIdx(manual.trophy), Math.max(0, contactIdx - 1));
   const trophy = frames[trophyIdx];
 
   // Ground level: where the feet are in the half-second before the trophy position,
@@ -228,6 +233,13 @@ export function analyseServe(rawFrames, options = {}) {
   frames.slice(0, contactIdx + 1).forEach((f) => {
     if (f.ball && f.ball.y < headY(f) && (!peak || f.ball.y < peak.y)) peak = { ...f.ball, f };
   });
+  if (Number.isFinite(manual.tossPeak)) {
+    // Use the ball seen closest in time to the chosen moment (within 3 frames).
+    const i = nearestIdx(manual.tossPeak);
+    const near = frames.slice(Math.max(0, i - 3), i + 4).filter((f) => f.ball)
+      .sort((a, b) => Math.abs(a.t - manual.tossPeak) - Math.abs(b.t - manual.tossPeak))[0];
+    peak = near ? { ...near.ball, f: near } : null;
+  }
   if (peak) {
     const cY = contactPoint ? contactPoint.y : groundY - m.contactHeight * H;
     m.tossHeight = (cY - peak.y) / H;
@@ -277,6 +289,7 @@ export function analyseServe(rawFrames, options = {}) {
     anchorX: mid(P(trophy, J.lAnkle), P(trophy, J.rAnkle)).x,
     playerHeightCm: options.heightCm || null,
     keyFrames: { trophy: trophy.t, contact: contact.t, tossPeak: peak ? peak.f.t : null },
+    manualKeyFrames: Object.keys(manual).filter((k) => Number.isFinite(manual[k])),
     framesWithPlayer: n,
     framesWithBall: frames.filter((f) => f.ball).length,
     framesWithRacket: frames.filter((f) => f.racket).length,
@@ -398,4 +411,22 @@ export function motionFrameAt(motion, t) {
   let best = null;
   for (const f of motion.frames) if (!best || Math.abs(f.t - t) < Math.abs(best.t - t)) best = f;
   return best;
+}
+
+// ---------- building a pro reference from several serves ----------
+// Averages the measurements the builder kept for each serve. A measurement only counts for a
+// serve if it was measured and not switched off.
+export function averageServes(serves) {
+  const out = {};
+  for (const key of Object.keys(METRICS)) {
+    const vals = serves.filter((s) => s.keep[key] && Number.isFinite(s.result.metrics[key])).map((s) => s.result.metrics[key]);
+    if (vals.length) out[key] = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 1000) / 1000;
+  }
+  return out;
+}
+
+// Returns the reference list with this pro added, or replaced if the id already exists.
+export function upsertPro(refs, entry) {
+  const pros = refs.pros.filter((p) => p.id !== entry.id).concat([entry]);
+  return { ...refs, pros };
 }

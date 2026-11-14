@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Serve Coach Reference Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Reference builder</h1>
+      </div>
+      <p class="side-foot"><a class="side-link" href="./">← Back to Serve Coach</a></p>
+
+      <section class="side-block">
+        <h2>Pro details</h2>
+        <label class="field" for="proId">Alias (shown to users)
+          <input type="text" id="proId" class="text" value="Pro D" autocomplete="off">
+          <span class="field-note" id="idNote"></span>
+        </label>
+        <label class="field" for="stance">Stance
+          <select id="stance">
+            <option value="auto">Detect from first serve</option>
+            <option value="pinpoint">Pinpoint</option>
+            <option value="platform">Platform</option>
+          </select>
+        </label>
+        <label class="field" for="hand">Hitting hand
+          <select id="hand">
+            <option value="auto">Detect from first serve</option>
+            <option value="right">Right-handed</option>
+            <option value="left">Left-handed</option>
+          </select>
+        </label>
+        <label class="field" for="heightCm">Height in cm
+          <input type="number" id="heightCm" min="140" max="230" step="1" placeholder="e.g. 188" inputmode="numeric">
+        </label>
+        <label class="field" for="view">Camera angle
+          <select id="view">
+            <option value="side">Side-on</option>
+            <option value="front">Front-on</option>
+            <option value="behind">From behind</option>
+          </select>
+        </label>
+        <label class="field" for="level">Level
+          <select id="level">
+            <option value="tour">Tour pro</option>
+            <option value="doubles">Doubles pro</option>
+            <option value="college">College / national level</option>
+            <option value="club">Strong club player</option>
+          </select>
+        </label>
+        <p class="field-note">Only the alias and these details are saved, and the repo is public. Keep the player's real name and the clip's source in your own notes.</p>
+      </section>
+
+      <section class="side-block">
+        <h2>Video</h2>
+        <label class="drop" for="file">
+          <input type="file" id="file" accept="video/*">
+          <span class="drop-title" id="fileName">Choose a serve clip</span>
+          <span class="drop-sub">One serve per analysis. Add 3–5 serves per pro.</span>
+        </label>
+        <label class="field" for="timeScale">Clip speed
+          <select id="timeScale">
+            <option value="1">Real time</option>
+            <option value="4">Slowed down 4×</option>
+            <option value="8">Slowed down 8×</option>
+          </select>
+        </label>
+        <label class="field" for="rate">Analysis detail
+          <select id="rate">
+            <option value="60">60 frames/s</option>
+            <option value="120" selected>120 frames/s (recommended for references)</option>
+            <option value="240">240 frames/s (240 fps clips only, slow)</option>
+          </select>
+        </label>
+        <button type="button" id="analyse" class="primary" disabled>Analyse this serve</button>
+        <div id="progressWrap" class="progress hidden"><div id="progressBar"></div></div>
+        <p id="status" class="status" aria-live="polite">Fill in the pro's details, then choose a clip.</p>
+      </section>
+
+      <section class="side-block">
+        <h2>Serves added</h2>
+        <ol id="serveList" class="serve-list"><li class="muted-item">None yet</li></ol>
+        <button type="button" id="save" class="primary" disabled>Download updated pros.json</button>
+        <p class="field-note">Then in Finder, replace <b>data/pros.json</b> in your serve-coach folder with the downloaded file, and commit and push in GitHub Desktop.</p>
+      </section>
+    </aside>
+
+    <main class="workspace">
+      <div class="banner">
+        <b>How it works:</b> choose a clip, trim it to one serve, analyse, check the key moments (fix them if needed), untick any measurement that looks wrong, then add the serve. Repeat for 3–5 serves. The pro's numbers are the average of the serves you added.
+      </div>
+
+      <section class="panel video-panel" aria-label="Video">
+        <div class="stage">
+          <video id="video" playsinline muted class="hidden"></video>
+          <canvas id="overlay" width="560" height="640"></canvas>
+        </div>
+        <div class="timeline">
+          <div class="trim-shade hidden" id="trimShade"></div>
+          <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Position in clip">
+          <div class="ticks" id="ticks"></div>
+        </div>
+        <div class="trim hidden" id="trimTools">
+          <span class="trim-title">Trim to the serve</span>
+          <button type="button" id="trimStart" class="ctrl">Set start here</button>
+          <button type="button" id="trimEnd" class="ctrl">Set end here</button>
+          <button type="button" id="trimClear" class="ghost">Reset</button>
+          <span id="trimInfo" class="time"></span>
+        </div>
+        <div class="trim hidden" id="keyTools">
+          <span class="trim-title">Fix key moments</span>
+          <button type="button" class="ctrl" data-set="trophy">Trophy is here</button>
+          <button type="button" class="ctrl" data-set="tossPeak">Toss peak is here</button>
+          <button type="button" class="ctrl" data-set="contact">Contact is here</button>
+          <button type="button" id="autoKeys" class="ghost">Back to automatic</button>
+          <p class="trim-help">Step frame by frame with ◀ ▶ to the exact moment, then press the button. The measurements update straight away.</p>
+        </div>
+        <div class="controls">
+          <button type="button" id="play" class="ctrl">Play</button>
+          <button type="button" id="back" class="ctrl" aria-label="Previous frame">◀</button>
+          <button type="button" id="fwd" class="ctrl" aria-label="Next frame">▶</button>
+          <select id="speed" aria-label="Playback speed">
+            <option value="1">1×</option>
+            <option value="0.5">0.5×</option>
+            <option value="0.25" selected>0.25×</option>
+          </select>
+          <span class="time" id="time">0.00 s</span>
+          <span class="layers">
+            <label><input type="checkbox" id="showPose" checked> Skeleton</label>
+            <label><input type="checkbox" id="showBall" checked> Ball</label>
+            <label><input type="checkbox" id="showRacket" checked> Racquet</label>
+          </span>
+        </div>
+      </section>
+
+      <section class="panel hidden" id="reviewPanel" aria-label="Review this serve">
+        <div class="section-head">
+          <h2>Check this serve</h2>
+          <button type="button" id="addServe" class="primary small">Add serve to pro</button>
+        </div>
+        <p class="footnote" id="reviewInfo"></p>
+        <table class="review">
+          <thead><tr><th>Keep</th><th>Measurement</th><th>Value</th><th>Phase</th></tr></thead>
+          <tbody id="reviewRows"></tbody>
+        </table>
+      </section>
+
+      <section class="panel" aria-label="Pro summary">
+        <div class="section-head"><h2 id="summaryTitle">Pro D so far</h2></div>
+        <table class="review">
+          <thead><tr><th>Measurement</th><th>Average</th><th>Serves</th><th>Spread</th></tr></thead>
+          <tbody id="avgRows"><tr><td colspan="4" class="muted-item">Add a serve to see the pro's numbers.</td></tr></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="js/builder.js"></script>
+</body>
+</html>

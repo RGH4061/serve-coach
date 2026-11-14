@@ -6,7 +6,7 @@ const root = new URL('../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, root), 'utf8');
 
 // Join the page's modules into one script, dropping import/export keywords.
-const modules = ['js/analysis.js', 'js/synthetic.js', 'js/dashboard.js', 'js/viewer.js', 'js/compare.js', 'js/app.js'];
+const modules = ['js/analysis.js', 'js/synthetic.js', 'js/dashboard.js', 'js/viewer.js', 'js/compare.js', 'js/pipeline.js', 'js/app.js'];
 const bundle = modules.map((m) => `// ---- ${m} ----\n` + read(m)
   .split('\n')
   .filter((line) => !/^import .* from '.*';$/.test(line) && !/^export \{.*\} from/.test(line))

@@ -5,6 +5,7 @@
 
 import { analyseServe, compareToPros, buildFeedback, ISSUES, exportMotion, pickPro } from './analysis.js';
 import { createComparison } from './compare.js';
+import { processVideo } from './pipeline.js';
 import { renderSummary, renderPhases, renderHistory } from './dashboard.js';
 import { createViewer } from './viewer.js';
 import { makeServe, FPS } from './synthetic.js';
@@ -12,7 +13,6 @@ import { makeServe, FPS } from './synthetic.js';
 const $ = (id) => document.getElementById(id);
 const video = $('video');
 const work = document.createElement('canvas');
-const wctx = work.getContext('2d', { willReadFrequently: true });
 
 let refs = null;        // professional reference numbers (data/pros.json)
 let lastResult = null;  // the latest real analysis
@@ -42,7 +42,7 @@ async function loadMotion(path) {
 async function showComparison(r, motion) {
   const choice = pickPro(refs, { stance: r.stance, view: r.view || 'side', hand: r.hand, heightCm: heightCm() });
   if (!choice || !motion || !motion.frames.length) { $('comparePanel').classList.add('hidden'); return; }
-  const proMotion = await loadMotion(choice.pro.motion);
+  const proMotion = typeof choice.pro.motion === 'object' ? choice.pro.motion : await loadMotion(choice.pro.motion);
   comparison.set(motion, proMotion, choice.pro.id);
   $('compareTitle').textContent = `You vs ${choice.pro.id}`;
   const p = choice.pro;
@@ -167,7 +167,17 @@ $('analyse').addEventListener('click', async () => {
   try {
     const det = await getDetectors();
     await det.loadModels(setStatus);
-    const frames = await processVideo(det);
+    const frames = await processVideo({
+      video, work, det,
+      start: trim ? trim.start : 0,
+      end: trim ? trim.end : video.duration,
+      rate: Number($('rate').value),
+      onFrame: (f) => viewer.drawFrame(f),
+      onProgress: (i, total) => {
+        $('progressBar').style.width = `${(i / total) * 100}%`;
+        setStatus(`Analysing frame ${i} of ${total}…`);
+      },
+    });
     const r = analyseServe(frames, { hand: $('hand').value, stance: $('stance').value, timeScale: Number($('timeScale').value), heightCm: heightCm(), view: $('view').value });
     r.issues = ticked();
     r.comparison = compareToPros(r, refs);
@@ -191,38 +201,6 @@ $('analyse').addEventListener('click', async () => {
     $('progressWrap').classList.add('hidden');
   }
 });
-
-function seekVideo(t) {
-  return new Promise((resolve) => {
-    const done = () => { video.removeEventListener('seeked', done); resolve(); };
-    video.addEventListener('seeked', done);
-    video.currentTime = t;
-  });
-}
-
-async function processVideo(det) {
-  const step = 1 / Number($('rate').value);
-  const start = trim ? trim.start : 0;
-  const end = trim ? trim.end : video.duration;
-  const total = Math.max(1, Math.floor((end - start) / step));
-  const out = [];
-  let lastBall = null;
-  video.pause();
-  for (let i = 0; i < total; i++) {
-    const t = start + i * step;
-    await seekVideo(t);
-    wctx.drawImage(video, 0, 0, work.width, work.height);
-    const pose = det.detectPose(work, Math.round(t * 1000) + 1);
-    const { balls, rackets } = await det.detectObjects(work);
-    const ball = det.chooseBall(balls, lastBall, work.height * 0.25);
-    if (ball) lastBall = ball;
-    out.push({ t, pose, ball, racket: rackets[0] || null });
-    viewer.drawFrame(out[out.length - 1]);
-    $('progressBar').style.width = `${((i + 1) / total) * 100}%`;
-    setStatus(`Analysing frame ${i + 1} of ${total}…`);
-  }
-  return out;
-}
 
 // ---------- download ----------
 $('download').addEventListener('click', () => {

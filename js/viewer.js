@@ -138,6 +138,7 @@ export function createViewer(els) {
     seek,
     now,
     onFrame(fn) { s.onFrame = fn; },
+    setKeyFrames(keyFrames) { s.keyFrames = keyFrames; placeMarkers(); },
     // Highlight the part of the clip that will be analysed (null = whole clip).
     setTrim(trim) {
       s.trim = trim;
