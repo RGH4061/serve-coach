@@ -77,6 +77,11 @@ check('pickPro: ignores pros without movement data', pickPro({ pros: [lib.pros[4
 const front = analyseServe(makeServe(), { view: 'front' });
 check('front-on view drops side-only measurements', !('tossPlacement' in front.metrics) && !('landing' in front.metrics));
 
+// Toss peak out of shot: hide the ball for 0.4 s around the real peak
+const noPeak = makeServe().map((f) => (f.t > 0.95 && f.t < 1.35 && f.ball ? { ...f, ball: null } : f));
+const rn = analyseServe(noPeak, {});
+check('toss height left blank when the top of the toss is not seen', !Number.isFinite(rn.metrics.tossHeight) && rn.metrics.tossNote, rn.metrics.tossNote);
+
 // Reference builder helpers
 const fixed = analyseServe(makeServe(), { keyFrames: { trophy: 0.8, contact: 1.25 } });
 check('manual key moments are used', near(fixed.keyFrames.trophy, 0.8, 0.01) && near(fixed.keyFrames.contact, 1.25, 0.01), JSON.stringify(fixed.keyFrames));

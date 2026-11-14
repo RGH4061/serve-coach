@@ -233,6 +233,15 @@ export function analyseServe(rawFrames, options = {}) {
   frames.slice(0, contactIdx + 1).forEach((f) => {
     if (f.ball && f.ball.y < headY(f) && (!peak || f.ball.y < peak.y)) peak = { ...f.ball, f };
   });
+  // Only trust the peak if the ball is seen rising just before it and falling just after it.
+  // Otherwise the real top of the toss was probably out of shot or missed.
+  if (peak && !Number.isFinite(manual.tossPeak)) {
+    const win = 0.3 * timeScale;
+    const seen = frames.filter((f) => f.ball && f.f !== peak.f && Math.abs(f.t - peak.f.t) <= win);
+    const before = seen.some((f) => f.t < peak.f.t && f.ball.y > peak.y);
+    const after = seen.some((f) => f.t > peak.f.t && f.ball.y > peak.y);
+    if (!(before && after)) { peak = null; m.tossNote = 'top of the toss not seen'; }
+  }
   if (Number.isFinite(manual.tossPeak)) {
     // Use the ball seen closest in time to the chosen moment (within 3 frames).
     const i = nearestIdx(manual.tossPeak);
