@@ -1,7 +1,7 @@
 // backdrop.js
-// The deepest background layer: a clay court at night with perspective court lines, a beam of
-// warm light coming in from the left, and dust drifting slowly through the beam.
-// The scene is drawn once (and on resize); only the dust moves. Movement stops if the user
+// The deepest background layer: a photograph of a clay court at night (img/clay-court.jpg),
+// blended into a blurred copy that fills the screen, with dust drifting slowly through its
+// beam of light. The scene is drawn once (and on resize); only the dust moves. Movement stops if the user
 // prefers reduced motion or the tab is hidden.
 
 (() => {
@@ -17,99 +17,67 @@
   let seed = 7;
   const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 
+  // The photograph: a clay court at night with a beam of light and dust.
+  const photo = new Image();
+  photo.src = window.__BACKDROP_IMG || 'img/clay-court.jpg';
+  photo.decoding = 'async';
+
   function paintScene() {
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const g = c.getContext('2d');
-    const horizon = H * 0.6;
+    g.fillStyle = '#0c0a08';
+    g.fillRect(0, 0, W, H);
+    const iw0 = photo.naturalWidth, ih0 = photo.naturalHeight;
 
-    // Night sky: near-black, slightly warmer towards the floor
-    const sky = g.createLinearGradient(0, 0, 0, horizon);
-    sky.addColorStop(0, '#080706');
-    sky.addColorStop(1, '#16100b');
-    g.fillStyle = sky;
-    g.fillRect(0, 0, W, horizon);
+    // Centre the photo in the area to the right of the sidebar (or the whole screen on phones).
+    const cssW = W / dpr;
+    const cx = (cssW > 820 ? 320 + (cssW - 320) / 2 : cssW / 2) * dpr;
+    const ih = H * 1.04, iw = (iw0 / ih0) * ih;
+    const ix = cx - iw / 2, iy = H - ih;
 
-    // Clay floor, darker in the distance
-    const floor = g.createLinearGradient(0, horizon, 0, H);
-    floor.addColorStop(0, '#2b170c');
-    floor.addColorStop(0.45, '#5a2e14');
-    floor.addColorStop(1, '#8a4620');
-    g.fillStyle = floor;
-    g.fillRect(0, horizon, W, H - horizon);
+    if (iw0) {
+      // 1. A blurred, darker copy stretched across the whole screen, so the clay and the light
+      //    carry on beyond the edges of the photo.
+      const scale = Math.max(W / iw0, H / ih0);
+      g.save();
+      g.filter = `blur(${Math.round(60 * dpr)}px) brightness(0.55) saturate(1.1)`;
+      g.drawImage(photo, (W - iw0 * scale) / 2, H - ih0 * scale, iw0 * scale, ih0 * scale);
+      g.restore();
 
-    // Court lines in perspective, converging on a point off to the right
-    const vp = { x: W * 1.25, y: horizon - H * 0.02 };
-    const line = (x0, w0, alpha) => {
-      // A strip from the bottom edge towards the vanishing point, narrowing with distance
-      const grad = g.createLinearGradient(x0, H, vp.x, vp.y);
-      grad.addColorStop(0, `rgba(244, 235, 224, ${alpha})`);
-      grad.addColorStop(0.75, `rgba(244, 235, 224, ${alpha * 0.25})`);
-      grad.addColorStop(1, 'rgba(244, 235, 224, 0)');
-      g.fillStyle = grad;
-      g.beginPath();
-      g.moveTo(x0 - w0 / 2, H);
-      g.lineTo(x0 + w0 / 2, H);
-      g.lineTo(vp.x, vp.y + 0.5);
-      g.lineTo(vp.x, vp.y - 0.5);
-      g.closePath();
-      g.fill();
-    };
-    g.filter = 'blur(0.6px)';
-    line(W * 0.02, Math.max(10, W * 0.012), 0.5);  // sideline
-    line(W * 0.2, Math.max(8, W * 0.009), 0.35);   // doubles alley line
-    // A line across the court (a service line), flatter and fainter
-    const yS = horizon + (H - horizon) * 0.18;
-    const across = g.createLinearGradient(0, yS, W, yS);
-    across.addColorStop(0, 'rgba(244, 235, 224, 0)');
-    across.addColorStop(0.35, 'rgba(244, 235, 224, 0.22)');
-    across.addColorStop(1, 'rgba(244, 235, 224, 0.05)');
-    g.fillStyle = across;
-    g.beginPath();
-    g.moveTo(0, yS + 4); g.lineTo(W, yS - H * 0.04); g.lineTo(W, yS - H * 0.04 + 2); g.lineTo(0, yS + 7);
-    g.closePath(); g.fill();
-    g.filter = 'none';
+      // 2. The sharp photo, with its left and right edges faded into the blurred copy.
+      const s = document.createElement('canvas');
+      s.width = Math.ceil(iw); s.height = Math.ceil(ih);
+      const sg = s.getContext('2d');
+      sg.drawImage(photo, 0, 0, iw, ih);
+      sg.globalCompositeOperation = 'destination-in';
+      const fade = sg.createLinearGradient(0, 0, iw, 0);
+      fade.addColorStop(0, 'rgba(0,0,0,0)');
+      fade.addColorStop(0.22, 'rgba(0,0,0,1)');
+      fade.addColorStop(0.78, 'rgba(0,0,0,1)');
+      fade.addColorStop(1, 'rgba(0,0,0,0)');
+      sg.fillStyle = fade;
+      sg.fillRect(0, 0, iw, ih);
+      g.drawImage(s, ix, iy);
+    }
 
-    // Light beam from the left, falling diagonally across the scene onto the clay
-    beam = {
-      top: [{ x: -W * 0.1, y: H * 0.28 }, { x: -W * 0.1, y: H * 0.5 }],
-      far: [{ x: W * 1.05, y: H * 0.55 }, { x: W * 1.05, y: H * 0.86 }],
-    };
-    g.save();
-    g.filter = `blur(${Math.round(Math.min(W, H) * 0.04)}px)`;
-    const b = g.createLinearGradient(0, H * 0.35, W, H * 0.7);
-    b.addColorStop(0, 'rgba(233, 193, 140, 0.38)');
-    b.addColorStop(0.5, 'rgba(233, 193, 140, 0.16)');
-    b.addColorStop(1, 'rgba(233, 193, 140, 0.02)');
-    g.fillStyle = b;
-    g.beginPath();
-    g.moveTo(beam.top[0].x, beam.top[0].y);
-    g.lineTo(beam.far[0].x, beam.far[0].y);
-    g.lineTo(beam.far[1].x, beam.far[1].y);
-    g.lineTo(beam.top[1].x, beam.top[1].y);
-    g.closePath();
-    g.fill();
-    // Where the beam lands on the clay
-    const pool = g.createRadialGradient(W * 0.3, H * 0.74, 0, W * 0.3, H * 0.74, W * 0.45);
-    pool.addColorStop(0, 'rgba(240, 170, 100, 0.22)');
-    pool.addColorStop(1, 'rgba(240, 170, 100, 0)');
-    g.fillStyle = pool;
-    g.fillRect(0, horizon - H * 0.1, W, H);
-    g.restore();
+    // The light beam in the photo, extended across the screen, for placing the moving dust.
+    const at = (fx, fy) => ({ x: ix + fx * iw, y: iy + fy * ih });
+    beam = { top: [at(0, 0.44), at(1, 0.62)], far: [at(0, 0.78), at(1, 0.76)] };
 
-    // Edges fall off into darkness
-    const vig = g.createRadialGradient(W * 0.45, H * 0.55, Math.min(W, H) * 0.25, W * 0.5, H * 0.5, Math.max(W, H) * 0.8);
-    vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    // Soft vignette, and a slight darkening so the panels' text stays easy to read.
+    const vig = g.createRadialGradient(cx, H * 0.6, Math.min(W, H) * 0.2, cx, H * 0.55, Math.max(W, H) * 0.85);
+    vig.addColorStop(0, 'rgba(0, 0, 0, 0.05)');
     vig.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
     g.fillStyle = vig;
     g.fillRect(0, 0, W, H);
 
-    // Fine grain, so the gradients don't band
+    // Fine grain, so the upscaled photo and gradients don't look smeared or banded.
     const grain = g.createImageData(W, H);
     for (let i = 0; i < grain.data.length; i += 4) {
       const v = rand() * 255;
       grain.data[i] = grain.data[i + 1] = grain.data[i + 2] = v;
-      grain.data[i + 3] = 7;
+      grain.data[i + 3] = 8;
     }
     const gc = document.createElement('canvas');
     gc.width = W; gc.height = H;
@@ -120,10 +88,8 @@
 
   // Dust: mostly inside the beam, a few specks elsewhere
   function inBeam(x, y) {
-    const k = x / W;
-    const top = (beam.top[0].y + (beam.far[0].y - beam.top[0].y) * k);
-    const bottom = (beam.top[1].y + (beam.far[1].y - beam.top[1].y) * k);
-    return y > top && y < bottom;
+    const lineY = ([p, q]) => p.y + ((q.y - p.y) * (x - p.x)) / ((q.x - p.x) || 1);
+    return y > lineY(beam.top) && y < lineY(beam.far);
   }
   function makeDust() {
     const n = Math.round((W * H) / (dpr * dpr) / 4500);
@@ -195,4 +161,6 @@
   still.addEventListener('change', setRunning);
   resize();
   setRunning();
+  // Redraw with the photo once it has loaded.
+  if (!photo.complete) photo.addEventListener('load', resize, { once: true });
 })();

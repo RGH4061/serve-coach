@@ -19,7 +19,7 @@ let html = read('index.html')
   .replace('<title>Serve Coach</title>', '<title>Serve Coach Dashboard</title>')
   .replace('<script type="module" src="js/backdrop.js"></script>\n  ', '')
   .replace('<script type="module" src="js/app.js"></script>',
-    `<script>window.__PREVIEW = true; window.__PROS = ${JSON.stringify(JSON.parse(read('data/pros.json')))}; window.__PRO_MOTIONS = ${JSON.stringify(Object.fromEntries(readdirSync(new URL('data/pros/', root)).map((f) => [`data/pros/${f}`, JSON.parse(read(`data/pros/${f}`))])))};</script>\n  <script type="module">\n${bundle}\n</script>`);
+    `<script>window.__PREVIEW = true; window.__BACKDROP_IMG = 'data:image/jpeg;base64,${readFileSync(new URL('img/clay-court.jpg', root)).toString('base64')}'; window.__PROS = ${JSON.stringify(JSON.parse(read('data/pros.json')))}; window.__PRO_MOTIONS = ${JSON.stringify(Object.fromEntries(readdirSync(new URL('data/pros/', root)).map((f) => [`data/pros/${f}`, JSON.parse(read(`data/pros/${f}`))])))};</script>\n  <script type="module">\n${bundle}\n</script>`);
 
 writeFileSync(new URL('preview.html', root), html);
 console.log('wrote preview.html', html.length, 'bytes');
