@@ -5,7 +5,7 @@
    frosted panels, soft large corners, pill buttons. */
 :root {
   --bg: #0c0a08;
-  --surface: rgba(30, 24, 19, 0.72);
+  --surface: rgba(28, 22, 18, 0.62);
   --surface-solid: #1b1612;
   --raised: rgba(255, 238, 220, 0.05);
   --field: rgba(255, 238, 220, 0.07);
@@ -16,7 +16,7 @@
   --accent-hi: #f29350;
   --sand: #e9c18c;
   --ball: #dbe65c;
-  --side-bg: rgba(16, 12, 10, 0.82);
+  --side-bg: rgba(16, 12, 10, 0.62);
   --side-ink: var(--ink);
   --side-muted: var(--muted);
   --side-line: var(--line);
@@ -33,16 +33,9 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
-body {
-  margin: 0; color: var(--ink); font: 15px/1.5 var(--font-body);
-  -webkit-font-smoothing: antialiased;
-  background:
-    linear-gradient(158deg, transparent 22%, rgba(233, 193, 140, 0.10) 38%, rgba(233, 193, 140, 0.03) 52%, transparent 62%),
-    radial-gradient(ellipse 70% 50% at 18% 38%, rgba(233, 193, 140, 0.10), transparent 70%),
-    radial-gradient(ellipse 90% 45% at 50% 108%, rgba(201, 106, 43, 0.28), transparent 70%),
-    var(--bg);
-  background-attachment: fixed;
-}
+body { margin: 0; color: var(--ink); font: 15px/1.5 var(--font-body); -webkit-font-smoothing: antialiased; background: var(--bg); }
+/* The painted clay-court scene (js/backdrop.js) sits behind everything */
+#backdrop { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; display: block; }
 h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
 .hidden { display: none !important; }
 button, select, input { font: inherit; }
