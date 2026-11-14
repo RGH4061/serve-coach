@@ -64,14 +64,14 @@
       }
     },
     {
-      "id": "Pro D",
+      "id": "Daddy Fed",
       "stance": "platform",
       "hand": "right",
       "view": "side",
       "heightCm": 185,
       "source": "footage",
       "analysisVersion": "analysis-0.3",
-      "motion": "data/pros/pro-d.json",
+      "motion": "data/pros/daddy-fed.json",
       "metrics": {
         "trophyElbow": 89.66,
         "shoulderTilt": 22.872,
