@@ -469,10 +469,12 @@ export function alignTime(t, you, pro) {
 }
 
 // Turns a motion frame into body-relative coordinates: units of player height, feet at 0,
-// court always to the right, centred on where the feet were at the trophy position.
-export function normaliseFrame(motion, frame) {
+// centred on where the feet were at the trophy position. courtDir sets which way the court
+// is drawn: 1 = to the right, -1 = to the left. Passing a serve's own dir draws it exactly as
+// filmed; passing another serve's dir turns it to face the same way as that one.
+export function normaliseFrame(motion, frame, courtDir = 1) {
   if (!frame) return null;
-  const n = (x, y) => ({ x: ((x - motion.anchorX) * (motion.dir || 1)) / motion.H, y: (motion.groundY - y) / motion.H });
+  const n = (x, y) => ({ x: ((x - motion.anchorX) * (motion.dir || 1) * courtDir) / motion.H, y: (motion.groundY - y) / motion.H });
   return { joints: frame.j.map(([x, y]) => n(x, y)), ball: frame.b ? n(frame.b[0], frame.b[1]) : null };
 }
 

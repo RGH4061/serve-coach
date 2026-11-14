@@ -12,7 +12,7 @@ const FIG_COLORS = { you: '#f4ebe0', pro: '#e9c18c' };
 
 export function createComparison(canvas) {
   const ctx = canvas.getContext('2d');
-  let you = null, pro = null, mode = 'side';
+  let you = null, pro = null, mode = 'side', flip = false;
 
   function figure(fr, ox, scale, groundY, color, alpha, hand) {
     if (!fr) return;
@@ -76,8 +76,10 @@ export function createComparison(canvas) {
     ctx.fillText('1.5 × height', 8, ground - 1.5 * scale - 6);
     if (!you || !pro) return;
 
-    const yf = normaliseFrame(you.motion, motionFrameAt(you.motion, t));
-    const pf = normaliseFrame(pro.motion, motionFrameAt(pro.motion, alignTime(t, you.motion, pro.motion)));
+    // You are drawn exactly as filmed; the pro is turned to face the same way as you.
+    const facing = you.motion.dir || 1;
+    const yf = normaliseFrame(you.motion, motionFrameAt(you.motion, t), facing);
+    const pf = normaliseFrame(pro.motion, motionFrameAt(pro.motion, alignTime(t, you.motion, pro.motion)), flip ? -facing : facing);
     if (mode === 'side') {
       figure(yf, W * 0.27, scale, ground, FIG_COLORS.you, 1, you.motion.hand);
       figure(pf, W * 0.7, scale, ground, FIG_COLORS.pro, 1, pro.motion.hand);
@@ -96,6 +98,7 @@ export function createComparison(canvas) {
       pro = proMotion ? { motion: proMotion, name: proName } : null;
     },
     setMode(m) { mode = m; },
+    setFlip(f) { flip = f; },
     draw,
   };
 }

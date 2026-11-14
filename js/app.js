@@ -53,6 +53,11 @@ document.querySelectorAll('#comparePanel .seg button').forEach((b) => b.addEvent
   document.querySelectorAll('#comparePanel .seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   comparison.setMode(b.dataset.mode);
 }));
+$('flipPro').addEventListener('click', () => {
+  const on = $('flipPro').getAttribute('aria-pressed') !== 'true';
+  $('flipPro').setAttribute('aria-pressed', String(on));
+  comparison.setFlip(on);
+});
 const motionCache = {};
 async function loadMotion(path) {
   if (window.__PRO_MOTIONS && window.__PRO_MOTIONS[path]) return window.__PRO_MOTIONS[path];
@@ -64,6 +69,8 @@ async function showComparison(r, motion) {
   if (!choice || !motion || !motion.frames.length) { $('comparePanel').classList.add('hidden'); return; }
   const proMotion = typeof choice.pro.motion === 'object' ? choice.pro.motion : await loadMotion(choice.pro.motion);
   comparison.set(motion, proMotion, choice.pro.id);
+  comparison.setFlip(false);
+  $('flipPro').setAttribute('aria-pressed', 'false');
   $('compareTitle').textContent = `You vs ${choice.pro.id}`;
   const p = choice.pro;
   $('compareNotes').innerHTML = `

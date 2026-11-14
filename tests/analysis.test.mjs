@@ -60,6 +60,12 @@ check('motion covers trophy to after contact', motion.frames[0].t <= r.keyFrames
 const atContact = normaliseFrame(motion, motionFrameAt(motion, r.keyFrames.contact));
 check('normalised feet near ground at start', Math.abs(normaliseFrame(motion, motion.frames[0]).joints[11].y) < 0.05);
 check('normalised ball ~1.55 H at contact', near(atContact.ball.y, 1.55, 0.06), atContact.ball.y.toFixed(2));
+// Drawing direction: own dir keeps the serve as filmed; another serve's dir turns it to match
+const fr = motion.frames[0];
+const asFilmed = normaliseFrame(motion, fr, motion.dir);
+check('own direction draws the serve as filmed (no mirror)', Math.sign(asFilmed.joints[11].x - asFilmed.joints[12].x) === Math.sign(fr.j[11][0] - fr.j[12][0]));
+const turned = normaliseFrame({ ...motion, dir: -motion.dir }, fr, motion.dir);
+check('a pro filmed facing the other way is turned to match', Math.sign(turned.joints[11].x - turned.joints[12].x) === -Math.sign(fr.j[11][0] - fr.j[12][0]));
 const slowMotion = { ...motion, timeScale: 4, keyFrames: { trophy: motion.keyFrames.trophy * 4, contact: motion.keyFrames.contact * 4 } };
 check('alignTime maps trophy to trophy', Math.abs(alignTime(r.keyFrames.trophy, motion, slowMotion) - slowMotion.keyFrames.trophy) < 1e-9);
 check('alignTime maps contact to contact', Math.abs(alignTime(r.keyFrames.contact, motion, slowMotion) - slowMotion.keyFrames.contact) < 1e-9);

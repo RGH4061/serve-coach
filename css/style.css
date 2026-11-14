@@ -158,6 +158,8 @@ button, select, input { font: inherit; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: #14100c; }
 @media (max-width: 1000px) { .compare-body { grid-template-columns: 1fr; } }
 
+.flip { margin-left: auto; font-size: 13px; padding: 5px 13px; }
+.flip[aria-pressed="true"] { background: var(--ink); color: #14100c; }
 /* breakdown detail */
 .seg-label { align-self: center; padding: 0 8px 0 10px; font-size: 12px; color: var(--muted); }
 .section-head.sub { margin-top: -4px; }
