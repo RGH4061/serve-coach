@@ -82,6 +82,18 @@ const noPeak = makeServe().map((f) => (f.t > 0.95 && f.t < 1.35 && f.ball ? { ..
 const rn = analyseServe(noPeak, {});
 check('toss height left blank when the top of the toss is not seen', !Number.isFinite(rn.metrics.tossHeight) && rn.metrics.tossNote, rn.metrics.tossNote);
 
+// Drive up out of the load
+check('drive speed measured', m.driveSpeed > 0.3 && m.driveSpeed < 2, m.driveSpeed?.toFixed(2));
+check('drive acceleration measured', m.driveAccel > 0.5, m.driveAccel?.toFixed(2));
+check('push starts at or after the load base', r.driveFrames.pushStart >= r.driveFrames.loadBase, JSON.stringify(r.driveFrames));
+check('drive time in real time for slow-mo', near(r4.metrics.driveTime, m.driveTime, 0.02), `${r4.metrics.driveTime?.toFixed(3)} vs ${m.driveTime?.toFixed(3)}`);
+const cmpDrive = compareToPros(r, { pros: [
+  { id: 'NoDrive', stance: 'pinpoint', view: 'side', metrics: { kneeFlex: 60 } },
+  { id: 'HasDrive', stance: 'platform', view: 'front', metrics: { driveSpeed: 1.0 } },
+] });
+const dRow = cmpDrive.rows.find((x) => x.key === 'driveSpeed');
+check('falls back to any pro that has the measurement', dRow.status !== 'missing' && dRow.pros[0].id === 'HasDrive', dRow.status);
+
 // Reference builder helpers
 const fixed = analyseServe(makeServe(), { keyFrames: { trophy: 0.8, contact: 1.25 } });
 check('manual key moments are used', near(fixed.keyFrames.trophy, 0.8, 0.01) && near(fixed.keyFrames.contact, 1.25, 0.01), JSON.stringify(fixed.keyFrames));

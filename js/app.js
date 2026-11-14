@@ -26,11 +26,31 @@ const viewer = createViewer({
   showPose: $('showPose'), showBall: $('showBall'), showRacket: $('showRacket'), trimShade: $('trimShade'),
 });
 
+// ---------- breakdown detail level ----------
+const DETAIL_HELP = {
+  1: 'Simple: a plain-words verdict for each part of the serve.',
+  2: 'Intermediate: the main measurements, each against the pro range.',
+  3: 'Pro depth: every measurement, each reference pro\'s value, scores and key-moment timings.',
+};
+let detail = 2;
+try { detail = Number(localStorage.getItem('detailLevel')) || 2; } catch { /* ignore */ }
+function setDetail(d) {
+  detail = d;
+  try { localStorage.setItem('detailLevel', String(d)); } catch { /* ignore */ }
+  document.querySelectorAll('#detailSeg button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.detail) === d)));
+  $('detailHelp').textContent = DETAIL_HELP[d];
+  drawPhases();
+}
+function drawPhases() {
+  if (shown) renderPhases($('phases'), shown.comparison, heightCm(), detail, shown);
+}
+document.querySelectorAll('#detailSeg button').forEach((b) => b.addEventListener('click', () => setDetail(Number(b.dataset.detail))));
+
 // ---------- you vs pro ----------
 const comparison = createComparison($('compareCanvas'));
 viewer.onFrame((t) => { if (!$('comparePanel').classList.contains('hidden')) comparison.draw(t); });
-document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
-  document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+document.querySelectorAll('#comparePanel .seg button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('#comparePanel .seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   comparison.setMode(b.dataset.mode);
 }));
 const motionCache = {};
@@ -97,7 +117,7 @@ $('heightCm').addEventListener('input', () => {
   try { localStorage.setItem('playerHeightCm', $('heightCm').value); } catch { /* ignore */ }
   if (shown) {
     shown.playerHeightCm = heightCm();
-    renderPhases($('phases'), shown.comparison, heightCm());
+    drawPhases();
     showComparison(shown, shownMotion);
   }
   setRefNote();
@@ -119,7 +139,7 @@ function showExample() {
   shownMotion = exportMotion(frames, r);
   showComparison(r, shownMotion);
   renderSummary($('summary'), r);
-  renderPhases($('phases'), r.comparison, heightCm());
+  drawPhases();
   const weeks = [52, 57, 55, 63, r.comparison.overall];
   renderHistory($('history'), weeks.map((overall, i) => ({ overall, date: Date.now() - (weeks.length - 1 - i) * 7 * 864e5 })));
   viewer.set({ mode: 'example', frames, keyFrames: r.keyFrames, width: 560, height: 640, duration: frames[frames.length - 1].t, step: 1 / FPS });
@@ -187,7 +207,7 @@ $('analyse').addEventListener('click', async () => {
     shownMotion = r.motion = exportMotion(frames, r);
     showComparison(r, shownMotion);
     renderSummary($('summary'), r);
-    renderPhases($('phases'), r.comparison, heightCm());
+    drawPhases();
     saveHistory(r);
     viewer.set({ mode: 'live', frames, keyFrames: r.keyFrames, width: work.width, height: work.height, duration: video.duration, step: 1 / Number($('rate').value) });
     viewer.setTrim(trim);
@@ -231,6 +251,7 @@ function setStatus(msg) { $('status').textContent = msg; }
 (async () => {
   refs = window.__PROS || await fetch('data/pros.json').then((r) => r.json());
   showExample();
+  setDetail(detail);
   const h = loadHistory();
   if (h.length) renderHistory($('history'), h);
   if (isPreview) setStatus('Layout preview with example data. Video analysis runs on the live site.');

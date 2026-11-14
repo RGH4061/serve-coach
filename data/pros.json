@@ -60,7 +60,11 @@
         "armExtension": 159.996,
         "jump": 0.088,
         "tossHeight": 0.165,
-        "legDriveLead": 0.117
+        "legDriveLead": 0.117,
+        "driveSpeed": 1.088,
+        "driveAccel": 9.376,
+        "driveTime": 0.367,
+        "driveRise": 0.215
       }
     },
     {
@@ -80,7 +84,11 @@
         "jump": 0.115,
         "legDriveLead": 0.233,
         "landing": 0.278,
-        "racquetDrop": 0.147
+        "racquetDrop": 0.147,
+        "driveSpeed": 0.912,
+        "driveAccel": 6.078,
+        "driveTime": 0.456,
+        "driveRise": 0.256
       },
       "level": "tour",
       "serves": 1,

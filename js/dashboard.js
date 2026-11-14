@@ -10,6 +10,8 @@ export function fmt(value, unit, heightCm) {
   if (value === null || value === undefined || !Number.isFinite(value)) return '–';
   if (unit === '°') return `${value.toFixed(0)}°`;
   if (unit === 's') return `${value.toFixed(2)} s`;
+  if (unit === 'H/s') return heightCm ? `${((value * heightCm) / 100).toFixed(2)} m/s` : `${value.toFixed(2)} H/s`;
+  if (unit === 'H/s²') return heightCm ? `${((value * heightCm) / 100).toFixed(1)} m/s²` : `${value.toFixed(1)} H/s²`;
   if (heightCm) {
     const cm = value * heightCm;
     return Math.abs(cm) >= 100 ? `${(cm / 100).toFixed(2)} m` : `${Math.round(cm)} cm`;
@@ -79,17 +81,17 @@ function gauge(row, hc) {
     </div>`;
 }
 
-export function renderPhases(el, comparison, heightCm) {
+export function renderPhases(el, comparison, heightCm, level = 2, result = null) {
   const byPhase = {};
   for (const row of comparison.rows) (byPhase[row.def.phase] ||= []).push(row);
-  el.innerHTML = Object.entries(PHASES).map(([key, phase], i) => {
-    const rows = byPhase[key] || [];
-    const scored = rows.filter((r) => r.status !== 'missing');
+  const timing = level >= 3 && result ? timingStrip(result) : '';
+  el.innerHTML = timing + `<div class="phases">` + Object.entries(PHASES).map(([key, phase], i) => {
+    const all = byPhase[key] || [];
+    const scored = all.filter((r) => r.status !== 'missing');
     const w = scored.reduce((a, r) => a + r.def.weight, 0);
     const phaseScore = w ? Math.round(scored.reduce((a, r) => a + r.score * r.def.weight, 0) / w) : null;
     const st = statusOf(phaseScore);
-    return `
-      <article class="phase ${st}">
+    const head = `
         <header>
           <div>
             <span class="step">${i + 1}</span>
@@ -97,18 +99,56 @@ export function renderPhases(el, comparison, heightCm) {
             <p>${phase.hint}</p>
           </div>
           <span class="pill ${st}">${phaseScore ?? '–'}</span>
-        </header>
-        ${rows.map((row) => `
-          <div class="metric">
-            <div class="metric-head"><span>${esc(row.def.label)}</span><b>${fmt(row.value, row.def.unit, heightCm)}</b></div>
-            ${gauge(row, heightCm)}
-            <div class="metric-foot">
-              <span>${row.status === 'missing' ? '' : `Pro ${fmt(row.lo, row.def.unit, heightCm)} – ${fmt(row.hi, row.def.unit, heightCm)}`}</span>
-              <span class="word ${statusOf(row.score)}">${STATUS_WORD[statusOf(row.score)]}</span>
-            </div>
-          </div>`).join('')}
-      </article>`;
-  }).join('');
+        </header>`;
+    if (level <= 1) return `<article class="phase ${st}">${head}${simpleBody(all, st)}</article>`;
+    const rows = all.filter((r) => r.def.level <= level);
+    return `<article class="phase ${st}">${head}${rows.map((row) => metricRow(row, heightCm, level)).join('')}</article>`;
+  }).join('') + `</div>`;
+}
+
+const VERDICT = { good: 'Pro level', close: 'Nearly there', work: 'Focus here', missing: 'Not measured' };
+
+// Simple: a plain-words verdict per phase instead of numbers.
+function simpleBody(rows, st) {
+  const good = rows.filter((r) => statusOf(r.score) === 'good').map((r) => r.def.plain);
+  const fix = rows.filter((r) => r.status !== 'missing' && statusOf(r.score) !== 'good')
+    .sort((a, b) => a.score - b.score)
+    .map((r) => `${r.def.plain} <span class="hint-word">(${r.direction === 'low' ? 'needs more' : 'too much'})</span>`);
+  return `
+    <p class="verdict ${st}">${VERDICT[st]}</p>
+    ${good.length ? `<p class="plain"><b>Doing well:</b> ${good.map(esc).join(', ')}</p>` : ''}
+    ${fix.length ? `<p class="plain"><b>Work on:</b> ${fix.join(', ')}</p>` : ''}
+    ${!good.length && !fix.length ? '<p class="plain">Not enough was seen in this clip to judge this part.</p>' : ''}`;
+}
+
+function metricRow(row, heightCm, level) {
+  const st = statusOf(row.score);
+  const proLine = level >= 3 && row.pros && row.pros.length
+    ? `<div class="metric-pros">${row.pros.map((p) => `${esc(p.id)} ${fmt(p.value, row.def.unit, heightCm)}`).join(' · ')}</div>` : '';
+  return `
+    <div class="metric">
+      <div class="metric-head"><span>${esc(row.def.label)}</span><b>${fmt(row.value, row.def.unit, heightCm)}</b></div>
+      ${gauge(row, heightCm)}
+      <div class="metric-foot">
+        <span>${row.status === 'missing' ? '' : `Pro ${fmt(row.lo, row.def.unit, heightCm)} – ${fmt(row.hi, row.def.unit, heightCm)}`}</span>
+        <span class="word ${st}">${level >= 3 && row.status !== 'missing' ? `${row.score} · ` : ''}${STATUS_WORD[st]}</span>
+      </div>
+      ${proLine}
+    </div>`;
+}
+
+// Pro depth: the order and real-time spacing of the key moments, measured from contact.
+function timingStrip(r) {
+  const ts = r.timeScale || 1;
+  const k = { ...(r.driveFrames || {}), ...r.keyFrames };
+  const items = [
+    ['loadBase', 'Load base'], ['pushStart', 'Push starts'], ['trophy', 'Trophy'],
+    ['tossPeak', 'Toss peak'], ['contact', 'Contact'], ['drivePeak', 'Highest point'],
+  ].filter(([key]) => Number.isFinite(k[key])).sort((a, b) => k[a[0]] - k[b[0]]);
+  return `<div class="timing">${items.map(([key, label]) => {
+    const dt = (k[key] - k.contact) / ts;
+    return `<div><span>${label}</span><b>${key === 'contact' ? '0.00 s' : `${dt > 0 ? '+' : ''}${dt.toFixed(2)} s`}</b></div>`;
+  }).join('')}<p class="timing-note">Real time, relative to contact.</p></div>`;
 }
 
 // ---------- progress chart ----------

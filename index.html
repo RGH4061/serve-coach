@@ -155,9 +155,18 @@
       <section aria-label="Serve phases">
         <div class="section-head">
           <h2>Breakdown by phase</h2>
+          <div class="seg" role="group" aria-label="Breakdown detail" id="detailSeg">
+            <span class="seg-label">Breakdown detail</span>
+            <button type="button" data-detail="1" aria-pressed="false">Simple</button>
+            <button type="button" data-detail="2" aria-pressed="true">Intermediate</button>
+            <button type="button" data-detail="3" aria-pressed="false">Pro depth</button>
+          </div>
+        </div>
+        <div class="section-head sub">
+          <p class="detail-help" id="detailHelp"></p>
           <p class="legend"><span class="band-key"></span> Pro range <span class="dot good"></span> In range <span class="dot close"></span> Close <span class="dot work"></span> Work on</p>
         </div>
-        <div class="phases" id="phases"></div>
+        <div id="phases"></div>
       </section>
 
       <section class="panel history-panel" aria-label="Progress">

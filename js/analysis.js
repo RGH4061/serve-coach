@@ -56,40 +56,55 @@ function smoothPoses(frames) {
 // ---------- metric definitions ----------
 // unit "H" means "player heights" so tall and short players compare fairly.
 export const METRICS = {
-  kneeFlex:      { phase: 'load', scale: [0, 100], label: 'Knee bend (deepest)', unit: '°', tol: 8, weight: 1.2,
+  kneeFlex:      { level: 1, plain: 'knee bend', phase: 'load', scale: [0, 100], label: 'Knee bend (deepest)', unit: '°', tol: 8, weight: 1.2,
                    low: 'Bend your knees more as you toss — think "sit into the serve" so your legs can drive you up.',
                    high: 'You are bending very deeply; a little less bend can make the leg drive quicker and more controlled.' },
-  trophyElbow:   { phase: 'trophy', scale: [40, 180], label: 'Hitting elbow angle at trophy', unit: '°', tol: 15, weight: 0.8,
+  trophyElbow:   { level: 2, plain: 'arm position at the trophy', phase: 'trophy', scale: [40, 180], label: 'Hitting elbow angle at trophy', unit: '°', tol: 15, weight: 0.8,
                    low: 'Your hitting elbow is very bent at the trophy position; open it a little so the racquet sits up behind your head.',
                    high: 'Your hitting arm is quite straight at the trophy position; bend the elbow to about a right angle to load the racquet.' },
-  shoulderTilt:  { phase: 'trophy', scale: [-10, 50], label: 'Shoulder tilt at trophy', unit: '°', tol: 7, weight: 1.0,
+  shoulderTilt:  { level: 3, plain: 'shoulder tilt', phase: 'trophy', scale: [-10, 50], label: 'Shoulder tilt at trophy', unit: '°', tol: 7, weight: 1.0,
                    low: 'Tilt your shoulders more at the trophy position — tossing shoulder up, hitting shoulder down — to help you hit up to the ball.',
                    high: 'Your shoulders are tilting a lot; this can pull the toss behind you. Aim for a slightly flatter tilt.' },
-  tossHeight:    { phase: 'toss', scale: [-0.2, 0.7], label: 'Toss peak above contact point', unit: 'H', tol: 0.1, weight: 1.0,
+  tossHeight:    { level: 1, plain: 'toss height', phase: 'toss', scale: [-0.2, 0.7], label: 'Toss peak above contact point', unit: 'H', tol: 0.1, weight: 1.0,
                    low: 'Your toss is low, so you are rushing. Toss a little higher so the ball peaks just above where you hit it.',
                    high: 'Your toss is going quite high, so the ball is falling fast at contact. Toss a bit lower for better timing.' },
-  tossPlacement: { sideOnly: true, phase: 'toss', scale: [-0.3, 0.8], label: 'Toss in front of front foot', unit: 'H', tol: 0.12, weight: 1.3,
+  tossPlacement: { level: 2, plain: 'toss position', sideOnly: true, phase: 'toss', scale: [-0.3, 0.8], label: 'Toss in front of front foot', unit: 'H', tol: 0.12, weight: 1.3,
                    low: 'Your toss is not far enough in front. Toss slightly more into the court so your body moves forward into the ball.',
                    high: 'Your toss is far in front of you, which often sends the ball into the net. Bring the toss back slightly.' },
-  racquetDrop:   { phase: 'contact', scale: [-0.2, 0.4], label: 'Racquet drop below shoulder', unit: 'H', tol: 0.08, weight: 0.8,
+  racquetDrop:   { level: 3, plain: 'racquet drop', phase: 'contact', scale: [-0.2, 0.4], label: 'Racquet drop below shoulder', unit: 'H', tol: 0.08, weight: 0.8,
                    low: 'The racquet is not dropping far down your back. Relax your arm so the racquet falls lower before swinging up.',
                    high: 'Your racquet drop is very deep; that is not usually a problem, but check it is not slowing your swing.' },
-  contactHeight: { phase: 'contact', scale: [1.0, 1.8], label: 'Contact height above ground', unit: 'H', tol: 0.08, weight: 1.3,
+  contactHeight: { level: 1, plain: 'contact height', phase: 'contact', scale: [1.0, 1.8], label: 'Contact height above ground', unit: 'H', tol: 0.08, weight: 1.3,
                    low: 'You are hitting the ball low. Reach up fully and hit at the top of your reach — low contact is a common reason serves go into the net.',
                    high: 'Your contact point is very high — great reach. Make sure you are not waiting for the ball to drop.' },
-  armExtension:  { phase: 'contact', scale: [120, 180], label: 'Hitting arm straightness at contact', unit: '°', tol: 10, weight: 1.0,
+  armExtension:  { level: 2, plain: 'reaching up at contact', phase: 'contact', scale: [120, 180], label: 'Hitting arm straightness at contact', unit: '°', tol: 10, weight: 1.0,
                    low: 'Your arm is bent at contact. Hit up with a straight arm at full stretch.',
                    high: 'Good full extension at contact.' },
-  jump:          { phase: 'finish', scale: [0, 0.3], label: 'Jump height (feet off ground)', unit: 'H', tol: 0.05, weight: 0.7,
+  jump:          { level: 2, plain: 'jumping into the ball', phase: 'finish', scale: [0, 0.3], label: 'Jump height (feet off ground)', unit: 'H', tol: 0.05, weight: 0.7,
                    low: 'You are staying on the ground. Let your leg drive lift you up into the ball.',
                    high: 'Big jump — make sure you stay balanced and land well.' },
-  legDriveLead:  { phase: 'finish', scale: [0, 0.5], label: 'Leg drive before contact', unit: 's', tol: 0.08, weight: 1.0,
+  legDriveLead:  { level: 3, plain: 'leg drive timing', phase: 'finish', scale: [0, 0.5], label: 'Leg drive before contact', unit: 's', tol: 0.08, weight: 1.0,
                    low: 'Your legs and arm are firing almost together. Push up with your legs first, then let the arm follow.',
                    high: 'Your leg drive is happening a long time before contact, so the energy is lost. Link the push up and swing more tightly.' },
-  landing:       { sideOnly: true, phase: 'finish', scale: [0, 1.2], label: 'Landing distance into court', unit: 'H', tol: 0.15, weight: 0.6,
+  landing:       { level: 2, plain: 'moving into the court', sideOnly: true, phase: 'finish', scale: [0, 1.2], label: 'Landing distance into court', unit: 'H', tol: 0.15, weight: 0.6,
                    low: 'You are landing close to where you started. Let your body move forward into the court after contact.',
                    high: 'You are travelling a long way forward after the serve — good if you serve and volley, otherwise check your balance.' },
+  driveSpeed:    { level: 1, plain: 'drive up from your knees', phase: 'finish', scale: [0, 1.6], label: 'Drive speed up from the load', unit: 'H/s', tol: 0.12, weight: 1.2,
+                   low: 'Your body rises slowly out of the knee bend. Push hard off the ground so your hips drive up towards the ball. This upward drive is a big source of serve power.',
+                   high: 'Very fast drive up out of the load. Make sure you stay balanced and on line.' },
+  driveAccel:    { level: 2, plain: 'explosive push', phase: 'finish', scale: [0, 14], label: 'Drive acceleration (power)', unit: 'H/s²', tol: 1.5, weight: 1.2,
+                   low: 'Your push up from the bottom of the knee bend builds speed slowly. Think "explode up": a quicker, sharper push, rather than a long slow stand-up.',
+                   high: 'Very explosive push. Good, as long as the toss and arm keep up with it.' },
+  driveTime:     { level: 3, plain: 'push time', phase: 'finish', scale: [0, 0.8], label: 'Push time (start of push to peak)', unit: 's', tol: 0.08, weight: 0.6,
+                   low: 'Your push up is very short; check you are fully loading the legs before driving up.',
+                   high: 'It takes a long time to get from the knee bend to full stretch. Make the push up quicker and more explosive.' },
+  driveRise:     { level: 3, plain: 'hip rise', phase: 'finish', scale: [0, 0.4], label: 'Hip rise from load to peak', unit: 'H', tol: 0.05, weight: 0.6,
+                   low: 'Your hips don\'t travel far up from the load. A deeper knee bend and a full push give a longer, more powerful drive.',
+                   high: 'Big hip rise from the load. Good use of the legs.' },
 };
+
+// Detail levels for the breakdown: 1 = Simple, 2 = Intermediate, 3 = Pro depth.
+export const DETAIL = { simple: 1, intermediate: 2, pro: 3 };
 
 // The stages of the serve, in order, used to group measurements on the dashboard.
 export const PHASES = {
@@ -278,6 +293,45 @@ export function analyseServe(rawFrames, options = {}) {
   }
   if (riseIdx !== null) m.legDriveLead = (contact.t - frames[riseIdx].t) / timeScale;
 
+  // Drive up out of the load (an indication of power). Follows the middle of the hips as a
+  // stand-in for the body's centre of mass:
+  //   load base   = lowest hip position between the toss and contact
+  //   peak        = highest hip position, up to 0.25 s after contact (usually in the air)
+  //   driveSpeed  = fastest upward hip speed on the way up (player heights per second, real time)
+  //   driveAccel  = average upward acceleration from the start of the push to that fastest moment
+  //   driveTime   = real time from the start of the push to the peak
+  //   driveRise   = how far the hips rise from the load base to the peak
+  const hipUp = frames.map((f) => (groundY - mid(P(f, J.lHip), P(f, J.rHip)).y) / H);
+  const half = 0.03 * timeScale; // extra smoothing: ±30 ms of real time, as speeds amplify jitter
+  const hipS = frames.map((f, i) => {
+    let sum = 0, k = 0;
+    for (let j = i; j >= 0 && f.t - frames[j].t <= half; j--) { sum += hipUp[j]; k++; }
+    for (let j = i + 1; j < n && frames[j].t - f.t <= half; j++) { sum += hipUp[j]; k++; }
+    return sum / k;
+  });
+  let baseIdx = tossUpIdx;
+  for (let i = tossUpIdx; i <= contactIdx; i++) if (hipS[i] < hipS[baseIdx]) baseIdx = i;
+  let peakIdx = baseIdx;
+  for (let i = baseIdx; i < n && frames[i].t - contact.t <= 0.25 * timeScale; i++) if (hipS[i] > hipS[peakIdx]) peakIdx = i;
+  let pushIdx = baseIdx;
+  if (peakIdx > baseIdx + 1) {
+    const vel = (i) => (hipS[i + 1] - hipS[i - 1]) / ((frames[i + 1].t - frames[i - 1].t) / timeScale);
+    let vMax = -Infinity, vIdx = baseIdx;
+    for (let i = Math.max(1, baseIdx); i <= Math.min(peakIdx, n - 2); i++) if (vel(i) > vMax) { vMax = vel(i); vIdx = i; }
+    if (vMax > 0) {
+      // The push starts when the hips begin rising in earnest (above 10% of top speed), not at the
+      // lowest point, so a player who holds the bottom of the knee bend isn't marked as slow.
+      pushIdx = vIdx;
+      while (pushIdx > Math.max(1, baseIdx) && vel(pushIdx - 1) > 0.1 * vMax) pushIdx--;
+      const tToV = (frames[vIdx].t - frames[pushIdx].t) / timeScale;
+      m.driveSpeed = vMax;
+      if (tToV > 0) m.driveAccel = vMax / tToV;
+      m.driveTime = (frames[peakIdx].t - frames[pushIdx].t) / timeScale;
+      m.driveRise = hipS[peakIdx] - hipS[baseIdx];
+    }
+  }
+  const keyExtra = { loadBase: frames[baseIdx].t, pushStart: frames[pushIdx].t, drivePeak: frames[peakIdx].t };
+
   // Landing: where the front foot first touches down after contact (not where the player
   // runs to afterwards, e.g. a doubles player moving in to the net).
   const after = frames.slice(contactIdx + 1).filter((f) => f.t - contact.t <= 0.6 * timeScale);
@@ -300,6 +354,7 @@ export function analyseServe(rawFrames, options = {}) {
     anchorX: mid(P(trophy, J.lAnkle), P(trophy, J.rAnkle)).x,
     playerHeightCm: options.heightCm || null,
     keyFrames: { trophy: trophy.t, contact: contact.t, tossPeak: peak ? peak.f.t : null },
+    driveFrames: keyExtra,
     manualKeyFrames: Object.keys(manual).filter((k) => Number.isFinite(manual[k])),
     framesWithPlayer: n,
     framesWithBall: frames.filter((f) => f.ball).length,
@@ -319,7 +374,10 @@ export function compareToPros(result, refs) {
   let total = 0, weights = 0;
   for (const [key, def] of Object.entries(METRICS)) {
     const value = result.metrics[key];
-    const proVals = group.map((p) => p.metrics[key]).filter(Number.isFinite);
+    // Use the closest group that has this measurement: same stance and angle, then same stance, then anyone.
+    const has = (list) => list.filter((p) => Number.isFinite(p.metrics[key]));
+    const used = [group, sameStance, refs.pros].map(has).find((l) => l.length) || [];
+    const proVals = used.map((p) => p.metrics[key]);
     if (!Number.isFinite(value) || !proVals.length) {
       rows.push({ key, def, value: null, status: 'missing' });
       continue;
@@ -331,7 +389,7 @@ export function compareToPros(result, refs) {
     const score = Math.max(0, Math.round(100 * (1 - off / (3 * def.tol))));
     const status = off === 0 ? 'good' : score >= 50 ? 'close' : 'work';
     const direction = value < lo ? 'low' : value > hi ? 'high' : null;
-    rows.push({ key, def, value, lo, hi, score, status, direction });
+    rows.push({ key, def, value, lo, hi, score, status, direction, pros: used.map((p) => ({ id: p.id, value: p.metrics[key] })) });
     total += score * def.weight;
     weights += def.weight;
   }
