@@ -100,6 +100,11 @@ const cmpDrive = compareToPros(r, { pros: [
 const dRow = cmpDrive.rows.find((x) => x.key === 'driveSpeed');
 check('falls back to any pro that has the measurement', dRow.status !== 'missing' && dRow.pros[0].id === 'HasDrive', dRow.status);
 
+// Facing direction isn't fooled by walking the other way at the start of the clip
+const walkIn = makeServe();
+const shifted = walkIn.map((f) => (f.t < 0.3 ? { ...f, pose: f.pose.map((p) => ({ ...p, x: p.x + (0.3 - f.t) * 1500 })) } : f));
+check('walking the other way at the start does not flip the facing', analyseServe(shifted, {}).dir === 1);
+
 // Flow
 const bell = Array.from({ length: 120 }, (_, i) => Math.exp(-(((i - 60) / 15) ** 2)));
 const bumpy = bell.map((v, i) => v * (1 + 0.4 * Math.sin(i / 3)));

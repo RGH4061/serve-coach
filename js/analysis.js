@@ -212,10 +212,29 @@ export function analyseServe(rawFrames, options = {}) {
   const setUp = frames.filter((f) => f.t >= trophy.t - 0.5 * timeScale && f.t <= trophy.t);
   const groundY = median(setUp.map((f) => Math.max(P(f, J.lAnkle).y, P(f, J.rAnkle).y)));
 
-  // 5. Which way is the court? The player moves towards it during the serve.
+  // 5. Which way is the player facing (where is the court)? Several clues vote, because any one
+  //    of them can be fooled (walking in at the start of a clip, a front-on camera, a missed ball):
+  //    - the ball at the top of the toss is in front of the body
+  //    - the hitting hand at contact is in front of the hips
+  //    - the hips travel towards the court from the trophy into the landing
+  //    - the head (nose) is in front of the shoulders
   const hipX = (f) => mid(P(f, J.lHip), P(f, J.rHip)).x;
-  const endF = frames[Math.min(n - 1, contactIdx + 5)];
-  let dir = Math.sign(hipX(endF) - hipX(frames[0])) || 1;
+  let dir = 1;
+  {
+    let votes = 0;
+    let top = null;
+    for (let i = 0; i <= contactIdx; i++) {
+      const b = frames[i].ball;
+      if (b && b.y < P(frames[i], J.nose).y && (!top || b.y < top.b.y)) top = { b, f: frames[i] };
+    }
+    if (top) votes += 2 * Math.max(-0.5, Math.min(0.5, (top.b.x - hipX(top.f)) / H));
+    votes += 1.5 * Math.max(-0.5, Math.min(0.5, (P(contact, S.hW).x - hipX(contact)) / H));
+    const after = frames[Math.min(n - 1, contactIdx + Math.max(1, Math.round(n * 0.1)))];
+    votes += 1 * Math.max(-0.5, Math.min(0.5, (hipX(after) - hipX(frames[trophyIdx])) / H));
+    const noseLead = frames.reduce((a, f) => a + (P(f, J.nose).x - mid(P(f, J.lShoulder), P(f, J.rShoulder)).x), 0) / n / H;
+    votes += 5 * Math.max(-0.1, Math.min(0.1, noseLead));
+    dir = votes < 0 ? -1 : 1;
+  }
   const frontAnkleX = (f) => (dir > 0 ? Math.max : Math.min)(P(f, J.lAnkle).x, P(f, J.rAnkle).x);
 
   // 6. Stance: pinpoint if the back foot slides up so the feet come close together.
