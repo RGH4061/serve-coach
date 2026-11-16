@@ -1,6 +1,6 @@
 # Serve Coach: accuracy roadmap
 
-Last updated: 14 November 2026 (analysis-0.3)
+Last updated: 16 November 2026 (analysis-0.3)
 
 This document lists where the measurements go wrong today, what each fix would cost, and the order to do them in. It is based on testing with a real professional serve: a 120 fps iPhone clip of a doubles pro, filmed front-on.
 
@@ -43,6 +43,7 @@ Effort: S = an afternoon, M = a few days, L = a week or more. Impact is on score
 
 ### Medium (M)
 
+- **Done (16 Nov): zoomed ball search and frame-to-frame tracking.** YOLO now also searches an enlarged square above the player's head and around the hands (from the full-resolution video), and a tracker follows the one tossed ball, accepting weak detections only where the ball is predicted to be. On the Pro C clip the ball was found in 55 of 55 frames from toss to contact (previously 45), with no wrong picks. Analysis takes roughly twice as long.
 - **Zoomed ball and racquet search.** Run YOLO a second time on a crop above the player's head (for the ball) and around the hitting hand (for the racquet). The ball becomes 3–4× larger to the model. This is likely the biggest cheap gain in ball detection.
 - **Fit the toss as a curve.** A tossed ball follows a parabola. Fitting one through the frames where it was seen gives the true peak height and position even when some frames miss the ball, and rejects false detections that don't fit.
 - **Contact from sound.** The strings hitting the ball make a sharp click in the audio. Finding that spike pins contact to about 1 ms, much better than the video. Browsers can decode the audio track of most phone videos.

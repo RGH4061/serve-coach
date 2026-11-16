@@ -9,7 +9,7 @@ Live site: https://rgh4061.github.io/serve-coach/
 Everything runs in the browser. The video never leaves the user's device.
 
 1. **Body tracking** – [MediaPipe Pose](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) finds 33 body joints in each frame.
-2. **Ball and racquet tracking** – YOLO11n (Ultralytics, COCO classes "sports ball" and "tennis racket") runs through ONNX Runtime Web.
+2. **Ball and racquet tracking** – YOLO11n (Ultralytics, COCO classes "sports ball" and "tennis racket") runs through ONNX Runtime Web, once on the whole frame and once zoomed in above the player's head and hands. A tracker then follows the one tossed ball from frame to frame.
 3. **Serve analysis** (`js/analysis.js`) finds the trophy position, toss peak and contact, works out the stance (pinpoint or platform), and measures knee bend, trophy elbow, shoulder tilt, toss height and placement, racquet drop, contact height, arm extension, jump, leg-drive timing and landing.
 4. **Comparison** – each measurement is scored 0–100 against the professional references for the same stance (`data/pros.json`), then weighted into one serve score.
 5. **Feedback** – the top three issues, prioritised by what the user ticked (into the net, long, and so on).
@@ -32,12 +32,13 @@ Measurements use **H** (the player's height) as the unit, so players of differen
 | `js/synthetic.js` | Computer-generated example serve (tests and example dashboard) |
 | `data/pros/` | Recorded pro movements for the side-by-side |
 | `builder.html`, `js/builder.js` | Reference builder for adding pros |
+| `js/ball-track.js` | Zoomed ball search region and frame-to-frame ball tracker |
 | `js/pipeline.js` | Steps through a video running the detectors (shared by both pages) |
 | `tools/add-pro.mjs` | Adds a pro reference from a downloaded analysis file |
 | `docs/accuracy-roadmap.md` | Known error sources and planned accuracy improvements |
 | `data/pros.json` | Professional reference numbers (Pro A, Pro B, …) |
 | `models/yolo11n.onnx` | YOLO model file |
-| `tests/` | Tests for the analysis code (`node tests/analysis.test.mjs`) |
+| `tests/` | Tests (`node tests/analysis.test.mjs`, `node tests/ball-track.test.mjs`) |
 
 ## Professional references
 

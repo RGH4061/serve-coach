@@ -46,16 +46,23 @@ export function detectPose(canvas, timestampMs) {
 
 export { chooseBall } from './yolo-decode.js';
 
-// Ball and racquet candidates for one frame.
+// Ball and racquet candidates for one frame (the whole frame, shrunk to 640x640).
 export async function detectObjects(canvas) {
+  return detectRegion(canvas, 0, 0, canvas.width, canvas.height, 1);
+}
+
+// Ball and racquet candidates in one part of an image, enlarged to 640x640 ("zooming in").
+// source: a video or canvas; (sx, sy, sw, sh): the part to search, in the source's own pixels;
+// k: multiplies the results to convert them to analysis-canvas pixels.
+export async function detectRegion(source, sx, sy, sw, sh, k) {
   const ort = window.ort;
-  // "Letterbox": shrink the frame to fit 640x640 without stretching it.
-  const scale = Math.min(YOLO_SIZE / canvas.width, YOLO_SIZE / canvas.height);
-  const w = Math.round(canvas.width * scale), h = Math.round(canvas.height * scale);
+  // "Letterbox": fit the region into 640x640 without stretching it.
+  const scale = Math.min(YOLO_SIZE / sw, YOLO_SIZE / sh);
+  const w = Math.round(sw * scale), h = Math.round(sh * scale);
   const padX = (YOLO_SIZE - w) / 2, padY = (YOLO_SIZE - h) / 2;
   yoloCtx.fillStyle = 'rgb(114,114,114)';
   yoloCtx.fillRect(0, 0, YOLO_SIZE, YOLO_SIZE);
-  yoloCtx.drawImage(canvas, padX, padY, w, h);
+  yoloCtx.drawImage(source, sx, sy, sw, sh, padX, padY, w, h);
   const { data } = yoloCtx.getImageData(0, 0, YOLO_SIZE, YOLO_SIZE);
 
   // Convert pixels to the number layout YOLO expects: [1, 3 colours, 640, 640], values 0-1.
@@ -67,5 +74,7 @@ export async function detectObjects(canvas) {
     input[i + 2 * area] = data[i * 4 + 2] / 255;
   }
   const out = await yolo.run({ images: new ort.Tensor('float32', input, [1, 3, YOLO_SIZE, YOLO_SIZE]) });
-  return decodeYolo(out.output0.data, { scale, padX, padY });
+  const found = decodeYolo(out.output0.data, { scale, padX, padY });
+  const toWork = (d) => ({ ...d, x: (sx + d.x) * k, y: (sy + d.y) * k, w: d.w * k, h: d.h * k });
+  return { balls: found.balls.map(toWork), rackets: found.rackets.map(toWork) };
 }

@@ -14,7 +14,9 @@ function iou(a, b) {
   return inter / (a.w * a.h + b.w * b.h - inter || 1);
 }
 
-export function decodeYolo(out, { scale, padX, padY }, n = 8400, classes = { ball: CLASS_BALL, racket: CLASS_RACKET }) {
+// minBall is low on purpose: weak ball detections are only accepted by the tracker
+// (ball-track.js) when they sit right where the ball is expected to be.
+export function decodeYolo(out, { scale, padX, padY }, n = 8400, classes = { ball: CLASS_BALL, racket: CLASS_RACKET }, minBall = 0.05) {
   const pick = (cls, minConf) => {
     const found = [];
     for (let i = 0; i < n; i++) {
@@ -37,7 +39,7 @@ export function decodeYolo(out, { scale, padX, padY }, n = 8400, classes = { bal
     }
     return kept;
   };
-  return { balls: pick(classes.ball, 0.12), rackets: pick(classes.racket, 0.2) };
+  return { balls: pick(classes.ball, minBall), rackets: pick(classes.racket, 0.2) };
 }
 
 // Pick one ball per frame: the candidate closest to where the ball was last seen,

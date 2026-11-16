@@ -1,4 +1,5 @@
 // pipeline.js
+import { createBallTracker, searchRegion, mergeCandidates } from './ball-track.js';
 // Steps through a video and runs the detectors on each frame. Shared by the main page and
 // the reference builder, so users and pros are always measured in exactly the same way.
 
@@ -58,7 +59,8 @@ export async function processVideo({ video, work, det, start = 0, end = video.du
   const step = 1 / rate;
   const total = Math.max(1, Math.floor((end - start) / step));
   const out = [];
-  let lastBall = null;
+  const tracker = createBallTracker();
+  const k = work.width / (video.videoWidth || work.width); // native video pixels -> analysis pixels
   // iPhone Safari sometimes gives blank frames until the video has played once.
   try { await video.play(); } catch { /* not allowed; carry on */ }
   video.pause();
@@ -68,10 +70,17 @@ export async function processVideo({ video, work, det, start = 0, end = video.du
     await seekVideo(video, t);
     ctx.drawImage(video, 0, 0, work.width, work.height);
     const pose = det.detectPose(work, Math.round(t * 1000) + 1);
-    const { balls, rackets } = await det.detectObjects(work);
-    const ball = det.chooseBall(balls, lastBall, work.height * 0.25);
-    if (ball) lastBall = ball;
-    out.push({ t, pose, ball, racket: rackets[0] || null });
+    // 1. Search the whole frame.
+    const full = await det.detectObjects(work);
+    // 2. Search again, zoomed in, where the ball should be: above the head, around the hands
+    //    and where the tracker predicts. Uses the full-resolution video for extra detail.
+    let zoom = { balls: [], rackets: [] };
+    const region = searchRegion(pose, tracker.predict(t), work.width, work.height);
+    if (region) zoom = await det.detectRegion(video, region.x / k, region.y / k, region.size / k, region.size / k, k);
+    // 3. Follow the one tossed ball from frame to frame.
+    const ball = tracker.update(t, mergeCandidates(full.balls, zoom.balls), pose);
+    const racket = [...full.rackets, ...zoom.rackets].sort((a, b) => b.conf - a.conf)[0] || null;
+    out.push({ t, pose, ball, racket, region });
     if (onFrame) onFrame(out[out.length - 1]);
     if (onProgress) onProgress(i + 1, total);
     if (document.hidden) throw new Error('Analysis stopped because the page went into the background. Keep this tab open and the screen on, then try again.');
