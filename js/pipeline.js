@@ -60,6 +60,7 @@ export async function processVideo({ video, work, det, start = 0, end = video.du
   const total = Math.max(1, Math.floor((end - start) / step));
   const out = [];
   const tracker = createBallTracker();
+  if (det.startRun) det.startRun();
   const k = work.width / (video.videoWidth || work.width); // native video pixels -> analysis pixels
   // iPhone Safari sometimes gives blank frames until the video has played once.
   try { await video.play(); } catch { /* not allowed; carry on */ }
@@ -69,7 +70,7 @@ export async function processVideo({ video, work, det, start = 0, end = video.du
     const t = start + i * step;
     await seekVideo(video, t);
     ctx.drawImage(video, 0, 0, work.width, work.height);
-    const pose = det.detectPose(work, Math.round(t * 1000) + 1);
+    const pose = det.detectPose(work, (t - start) * 1000);
     // 1. Search the whole frame.
     const full = await det.detectObjects(work);
     // 2. Search again, zoomed in, where the ball should be: above the head, around the hands

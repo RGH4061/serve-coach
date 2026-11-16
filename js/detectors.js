@@ -37,9 +37,20 @@ export async function loadModels(onStatus = () => {}) {
   }
 }
 
-// Body joints for one frame. Returns 33 points in pixels, or null if no-one is found.
-export function detectPose(canvas, timestampMs) {
-  const res = pose.detectForVideo(canvas, timestampMs);
+// MediaPipe's video mode needs every frame's timestamp to be later than the one before, for as
+// long as the page is open. Clip times start again from 0 (a new clip, re-analysing, or moving
+// the trim), so we keep one clock that only goes forward. Each analysis starts a new "run" with
+// a gap, so the tracker doesn't treat it as a continuation of the previous clip.
+let clock = 0;
+let runBase = 0;
+export function startRun() { runBase = clock + 10000; }
+
+// Body joints for one frame. msIntoRun: milliseconds since the start of this analysis.
+// Returns 33 points in pixels, or null if no-one is found.
+export function detectPose(canvas, msIntoRun) {
+  const ts = Math.max(clock + 1, runBase + Math.round(msIntoRun));
+  clock = ts;
+  const res = pose.detectForVideo(canvas, ts);
   if (!res.landmarks || !res.landmarks.length) return null;
   return res.landmarks[0].map((p) => ({ x: p.x * canvas.width, y: p.y * canvas.height, v: p.visibility ?? 1 }));
 }

@@ -44,6 +44,9 @@ $('heightCm').addEventListener('input', () => { renderReview(); renderAverage();
 $('file').addEventListener('change', () => {
   const file = $('file').files[0];
   if (!file) return;
+  // Clear the chooser, so picking the same file again still counts as a new choice.
+  $('file').value = '';
+  $('analyse').disabled = true; // until the new video has opened
   $('fileName').textContent = file.name;
   setStatus('Opening the video…');
   loadVideoFile(video, file, {
@@ -83,6 +86,7 @@ $('trimClear').addEventListener('click', () => setTrim(null));
 // ---------- analyse ----------
 $('analyse').addEventListener('click', async () => {
   $('analyse').disabled = true;
+  $('file').disabled = true; // changing the video mid-analysis would mix two clips
   $('progressWrap').classList.remove('hidden');
   try {
     const det = await import('./detectors.js');
@@ -107,6 +111,7 @@ $('analyse').addEventListener('click', async () => {
     setStatus(err.message);
   } finally {
     $('analyse').disabled = false;
+    $('file').disabled = false;
     $('progressWrap').classList.add('hidden');
   }
 });
