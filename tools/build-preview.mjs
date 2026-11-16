@@ -16,7 +16,7 @@ const bundle = modules.map((m) => `// ---- ${m} ----\n` + read(m)
 let html = read('index.html')
   .replace('<link rel="stylesheet" href="css/style.css">', `<style>\n${read('css/style.css')}\n</style>`)
   .replace(/\s*<!-- ONNX Runtime[^\n]*\n\s*<script src="[^"]*ort\.min\.js"><\/script>/, '')
-  .replace('<title>Serve Coach</title>', '<title>Serve Coach Dashboard</title>')
+  .replace('<title>Serve analysis</title>', '<title>Serve analysis</title>')
   .replace('<script type="module" src="js/backdrop.js"></script>\n  ', '')
   .replace('<script type="module" src="js/app.js"></script>',
     `<script>window.__PREVIEW = true; window.__BACKDROP_IMG = 'data:image/jpeg;base64,${readFileSync(new URL('img/clay-court.jpg', root)).toString('base64')}'; window.__PROS = ${JSON.stringify(JSON.parse(read('data/pros.json')))}; window.__PRO_MOTIONS = ${JSON.stringify(Object.fromEntries(readdirSync(new URL('data/pros/', root)).map((f) => [`data/pros/${f}`, JSON.parse(read(`data/pros/${f}`))])))};</script>\n  <script type="module">\n${bundle}\n</script>`);
