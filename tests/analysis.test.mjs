@@ -1,7 +1,7 @@
 // Tests the serve analysis on a made-up (synthetic) serve where we know the right answers.
 // Run with:  node tests/analysis.test.mjs
 import { readFileSync } from 'node:fs';
-import { analyseServe, compareToPros, buildFeedback, averageServes, upsertPro, exportMotion, pickPro, alignTime, normaliseFrame, motionFrameAt } from '../js/analysis.js';
+import { analyseServe, compareToPros, buildFeedback, sparc, averageServes, upsertPro, exportMotion, pickPro, alignTime, normaliseFrame, motionFrameAt } from '../js/analysis.js';
 import { makeServe, H, G, FPS } from '../js/synthetic.js';
 
 let failures = 0;
@@ -99,6 +99,22 @@ const cmpDrive = compareToPros(r, { pros: [
 ] });
 const dRow = cmpDrive.rows.find((x) => x.key === 'driveSpeed');
 check('falls back to any pro that has the measurement', dRow.status !== 'missing' && dRow.pros[0].id === 'HasDrive', dRow.status);
+
+// Flow
+const bell = Array.from({ length: 120 }, (_, i) => Math.exp(-(((i - 60) / 15) ** 2)));
+const bumpy = bell.map((v, i) => v * (1 + 0.4 * Math.sin(i / 3)));
+check('SPARC: smooth movement scores closer to 0 than a bumpy one', sparc(bell, 60) > sparc(bumpy, 60), `${sparc(bell, 60).toFixed(2)} vs ${sparc(bumpy, 60).toFixed(2)}`);
+check('flow smoothness measured', Number.isFinite(m.flowSmoothness) && m.flowSmoothness < 0, m.flowSmoothness?.toFixed(2));
+check('kinetic chain order measured 0-3', m.chainOrder >= 0 && m.chainOrder <= 3, m.chainOrder);
+check('flow curve has key moments', r.flow && r.flow.t.length > 10 && Number.isFinite(r.flow.marks.contact));
+// Freeze at the trophy for 0.3 s: the longest pause should find it
+const base = makeServe();
+const freezeAt = base.findIndex((f) => f.t >= 0.9);
+const held = [...base.slice(0, freezeAt), ...Array.from({ length: 18 }, (_, k) => ({ ...base[freezeAt], t: base[freezeAt].t + k / 60 })),
+  ...base.slice(freezeAt).map((f) => ({ ...f, t: f.t + 0.3 }))];
+const rp = analyseServe(held, {});
+check('a 0.3 s freeze shows up as a pause', near(rp.metrics.flowPause, 0.3, 0.1), rp.metrics.flowPause?.toFixed(2));
+check('a smooth serve has little or no pause', m.flowPause < 0.1, m.flowPause?.toFixed(2));
 
 // Reference builder helpers
 const fixed = analyseServe(makeServe(), { keyFrames: { trophy: 0.8, contact: 1.25 } });

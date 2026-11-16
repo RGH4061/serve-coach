@@ -101,6 +101,15 @@ export const METRICS = {
   driveRise:     { level: 3, plain: 'hip rise', phase: 'finish', scale: [0, 0.4], label: 'Hip rise from load to peak', unit: 'H', tol: 0.05, weight: 0.6,
                    low: 'Your hips don\'t travel far up from the load. A deeper knee bend and a full push give a longer, more powerful drive.',
                    high: 'Big hip rise from the load. Good use of the legs.' },
+  flowSmoothness: { level: 1, plain: 'smooth rhythm', phase: 'flow', scale: [-8, -1], label: 'Smoothness (bounce to landing)', unit: 'sparc', tol: 0.5, weight: 1.0,
+                   low: 'Your motion speeds up and slows down in jerky bursts. Aim for one continuous rhythm from the bounce to the landing, building speed steadily into contact.',
+                   high: 'Very smooth, continuous motion from the bounce to the landing.' },
+  flowPause:     { level: 2, plain: 'no long pauses', phase: 'flow', scale: [0, 0.8], label: 'Longest pause in the motion', unit: 's', tol: 0.08, weight: 0.8,
+                   low: 'Your motion never pauses, which is fine as long as it stays controlled.',
+                   high: 'There is a noticeable stop in your motion (often at the trophy or just after the toss). A brief hold is fine, but a long stop breaks the rhythm and wastes the energy you have built up.' },
+  chainOrder:    { level: 2, plain: 'body parts firing in order', phase: 'flow', scale: [0, 3], label: 'Kinetic chain order (hips → shoulders → elbow → wrist)', unit: 'of 3', tol: 0.5, weight: 1.0,
+                   low: 'Your body parts are not speeding up in order. Power flows up a chain: hips first, then shoulders, then elbow, then wrist and racquet. Let each one lead the next rather than swinging with the arm.',
+                   high: 'Good sequencing.' },
 };
 
 // Detail levels for the breakdown: 1 = Simple, 2 = Intermediate, 3 = Pro depth.
@@ -340,6 +349,10 @@ export function analyseServe(rawFrames, options = {}) {
   const touch = wasAir >= 0 ? after.slice(wasAir).find((f) => groundY - lowFoot(f) <= 0.03 * H) : null;
   if (touch) m.landing = (frontAnkleX(touch) * dir - frontAnkleX(trophy) * dir) / H;
 
+  // ---------- Flow: how smooth the whole motion is, from the last ball bounce to landing ----------
+  const flow = analyseFlow({ frames, P, S, H, groundY, timeScale, tossUpIdx, trophyIdx, contactIdx, touch, contact });
+  Object.assign(m, flow.metrics);
+
   // Forward/backward distances can only be measured when filmed side-on.
   const view = options.view || 'side';
   if (view !== 'side') for (const [k, def] of Object.entries(METRICS)) if (def.sideOnly) delete m[k];
@@ -355,6 +368,7 @@ export function analyseServe(rawFrames, options = {}) {
     playerHeightCm: options.heightCm || null,
     keyFrames: { trophy: trophy.t, contact: contact.t, tossPeak: peak ? peak.f.t : null },
     driveFrames: keyExtra,
+    flow: flow.curve,
     manualKeyFrames: Object.keys(manual).filter((k) => Number.isFinite(manual[k])),
     framesWithPlayer: n,
     framesWithBall: frames.filter((f) => f.ball).length,
@@ -382,8 +396,9 @@ export function compareToPros(result, refs) {
       rows.push({ key, def, value: null, status: 'missing' });
       continue;
     }
-    const lo = Math.min(...proVals) - def.tol;
-    const hi = Math.max(...proVals) + def.tol;
+    // Never show a range outside what's physically possible (e.g. a negative pause).
+    const lo = Math.max(def.scale[0], Math.min(...proVals) - def.tol);
+    const hi = Math.min(def.scale[1], Math.max(...proVals) + def.tol);
     const off = value < lo ? lo - value : value > hi ? value - hi : 0;
     // Inside the pro range scores 100. Falls to 0 at three tolerances outside it.
     const score = Math.max(0, Math.round(100 * (1 - off / (3 * def.tol))));
@@ -421,12 +436,13 @@ export function buildFeedback(comparison, ticked = []) {
 // Joints kept for drawing: nose, shoulders, elbows, wrists, hips, knees, ankles.
 export const MOTION_JOINTS = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
 
-// A compact copy of the movement (from about 1 s before the trophy to just after landing),
+// A compact copy of the movement (from about 2.5 s before the trophy, to include the ball
+// bounce, until just after landing),
 // so a serve can be replayed as a stick figure or saved as a pro reference.
 export function exportMotion(frames, r) {
   const ts = r.timeScale || 1;
   const r1 = (v) => Math.round(v * 10) / 10;
-  const keep = frames.filter((f) => f.pose && f.t >= r.keyFrames.trophy - 1.0 * ts && f.t <= r.keyFrames.contact + 0.8 * ts);
+  const keep = frames.filter((f) => f.pose && f.t >= r.keyFrames.trophy - 2.5 * ts && f.t <= r.keyFrames.contact + 0.8 * ts);
   return {
     hand: r.hand, stance: r.stance, view: r.view || 'side', dir: r.dir, timeScale: ts,
     H: r.playerHeightPx, groundY: r.groundY, anchorX: r.anchorX, keyFrames: r.keyFrames,
@@ -500,4 +516,126 @@ export function averageServes(serves) {
 export function upsertPro(refs, entry) {
   const pros = refs.pros.filter((p) => p.id !== entry.id).concat([entry]);
   return { ...refs, pros };
+}
+
+// ---------- flow helpers ----------
+// Spectral arc length (SPARC, Balasubramanian et al. 2015): a standard smoothness measure for a
+// speed profile. Closer to 0 = smoother; more negative = more jerky changes of speed. It copes
+// with video jitter better than jerk-based measures.
+export function sparc(speed, fs, fMax = 10, ampTh = 0.05) {
+  const n = speed.length;
+  if (n < 8) return NaN;
+  const N = 2 ** (Math.ceil(Math.log2(n)) + 4);
+  const df = fs / N;
+  const kMax = Math.min(Math.floor(fMax / df), N / 2);
+  const mag = [];
+  for (let k = 0; k <= kMax; k++) {
+    let re = 0, im = 0;
+    const w = (-2 * Math.PI * k) / N;
+    for (let i = 0; i < n; i++) { re += speed[i] * Math.cos(w * i); im += speed[i] * Math.sin(w * i); }
+    mag.push(Math.hypot(re, im));
+  }
+  const top = Math.max(...mag) || 1;
+  const M = mag.map((v) => v / top);
+  let last = 0;
+  M.forEach((v, k) => { if (v >= ampTh) last = k; });
+  if (last < 1) return NaN;
+  let arc = 0;
+  for (let k = 1; k <= last; k++) arc += Math.hypot(1 / last, M[k] - M[k - 1]);
+  return -arc;
+}
+
+function analyseFlow({ frames, P, S, H, groundY, timeScale, tossUpIdx, trophyIdx, contactIdx, touch, contact }) {
+  const n = frames.length;
+  const JOINTS = MOTION_JOINTS;
+  const realDt = (a, b) => (frames[b].t - frames[a].t) / timeScale;
+
+  // Whole-body speed: average speed of the main joints, in player heights per second (real time).
+  const raw = frames.map((f, i) => {
+    if (i === 0) return 0;
+    const g = frames[i - 1];
+    const dt = realDt(i - 1, i) || 1e-3;
+    let sum = 0;
+    for (const j of JOINTS) sum += Math.hypot(f.pose[j].x - g.pose[j].x, f.pose[j].y - g.pose[j].y);
+    return sum / JOINTS.length / H / dt;
+  });
+  raw[0] = raw[1] || 0;
+  const half = 0.04 * timeScale;
+  const speed = frames.map((f, i) => {
+    let sum = 0, k = 0;
+    for (let j = i; j >= 0 && f.t - frames[j].t <= half; j--) { sum += raw[j]; k++; }
+    for (let j = i + 1; j < n && frames[j].t - f.t <= half; j++) { sum += raw[j]; k++; }
+    return sum / k;
+  });
+
+  // Start: the last ball bounce before the toss (ball at its lowest, near the ground).
+  let bounceIdx = null;
+  for (let i = 1; i < Math.max(1, tossUpIdx) - 1; i++) {
+    const b = frames[i].ball, a = frames[i - 1].ball, c = frames[i + 1].ball;
+    if (b && a && c && b.y >= a.y && b.y >= c.y && groundY - b.y < 0.3 * H) bounceIdx = i;
+  }
+  const startIdx = bounceIdx ?? 0;
+  // End: first touchdown after contact, or 0.6 s after contact.
+  let endIdx = touch ? frames.indexOf(touch) : -1;
+  if (endIdx < 0) { endIdx = contactIdx; while (endIdx < n - 1 && realDt(contactIdx, endIdx + 1) <= 0.6) endIdx++; }
+
+  const seg = speed.slice(startIdx, endIdx + 1);
+  const fs = (seg.length - 1) / (realDt(startIdx, endIdx) || 1);
+  const metrics = {};
+  const smooth = sparc(seg, fs);
+  if (Number.isFinite(smooth) && realDt(startIdx, endIdx) > 0.4) metrics.flowSmoothness = smooth;
+
+  // Longest pause once the serve motion has started (ignores standing still after the bounce).
+  const peak = Math.max(...speed.slice(startIdx, contactIdx + 1));
+  const slow = 0.08 * peak; // "paused" = moving at under 8% of top speed
+  let moveIdx = startIdx;
+  while (moveIdx < contactIdx && speed[moveIdx] < 0.12 * peak) moveIdx++; // motion has started at 12% of top speed
+  let longest = 0, runStart = null, pause = null;
+  for (let i = moveIdx; i <= contactIdx; i++) {
+    if (speed[i] < slow) {
+      if (runStart === null) runStart = i;
+      const len = realDt(runStart, i);
+      if (len > longest) { longest = len; pause = [frames[runStart].t, frames[i].t]; }
+    } else runStart = null;
+  }
+  if (contactIdx > moveIdx) metrics.flowPause = longest;
+
+  // Kinetic chain: when hips, shoulders, elbow and wrist each reach top speed (trophy to contact).
+  const partSpeed = (pick) => frames.map((f, i) => {
+    if (i === 0) return 0;
+    const a = pick(frames[i - 1]), b = pick(f);
+    return Math.hypot(b.x - a.x, b.y - a.y) / (realDt(i - 1, i) || 1e-3);
+  });
+  // Hitting-side hip and shoulder: on flat video their movement shows the body's rotation better
+  // than the middle of the hips or shoulders does.
+  const hHip = S.hS === J.rShoulder ? J.rHip : J.lHip;
+  const parts = [(f) => P(f, hHip), (f) => P(f, S.hS), (f) => P(f, S.hE), (f) => P(f, S.hW)];
+  let endChain = contactIdx;
+  while (endChain < n - 1 && realDt(contactIdx, endChain + 1) <= 0.05) endChain++;
+  const peaks = parts.map((pick) => {
+    const v = partSpeed(pick);
+    let best = trophyIdx;
+    for (let i = trophyIdx; i <= endChain; i++) if (v[i] > v[best]) best = i;
+    return frames[best].t;
+  });
+  if (contactIdx > trophyIdx + 2) {
+    const tolT = 0.5 * (frames[1].t - frames[0].t);
+    metrics.chainOrder = [0, 1, 2].filter((k) => peaks[k] <= peaks[k + 1] + tolT).length;
+  }
+
+  // A compact speed curve for the dashboard chart (about 80 points).
+  const every = Math.max(1, Math.ceil((endIdx - startIdx + 1) / 80));
+  const curve = {
+    t: [], v: [],
+    marks: {
+      bounce: bounceIdx !== null ? frames[bounceIdx].t : null,
+      start: frames[moveIdx].t, trophy: frames[trophyIdx].t, contact: contact.t,
+      landing: touch ? touch.t : null,
+    },
+    pause: longest >= 0.05 ? pause : null,
+    chainPeaks: { hips: peaks[0], shoulders: peaks[1], elbow: peaks[2], wrist: peaks[3] },
+    timeScale,
+  };
+  for (let i = startIdx; i <= endIdx; i += every) { curve.t.push(Math.round(frames[i].t * 1000) / 1000); curve.v.push(Math.round(speed[i] * 1000) / 1000); }
+  return { metrics, curve };
 }

@@ -107,6 +107,7 @@
             <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Position in clip">
             <div class="ticks" id="ticks"></div>
           </div>
+          <div class="key-jump" id="keyJump"></div>
           <div class="trim hidden" id="trimTools">
             <span class="trim-title">Trim to the serve</span>
             <button type="button" id="trimStart" class="ctrl">Set start here</button>
@@ -143,7 +144,6 @@
       <section class="panel compare-panel hidden" id="comparePanel" aria-label="You compared with a pro">
         <div class="section-head">
           <h2 id="compareTitle">You vs Pro</h2>
-          <button type="button" id="flipPro" class="ghost flip" aria-pressed="false" title="Use if the pro is facing the opposite way to you">Flip pro</button>
           <div class="seg" role="group" aria-label="Comparison view">
             <button type="button" data-mode="side" aria-pressed="true">Side by side</button>
             <button type="button" data-mode="overlay" aria-pressed="false">Overlay</button>
@@ -170,6 +170,17 @@
           <p class="legend"><span class="band-key"></span> Pro range <span class="dot good"></span> In range <span class="dot close"></span> Close <span class="dot work"></span> Work on</p>
         </div>
         <div id="phases"></div>
+      </section>
+
+      <section class="panel flow-panel" aria-label="Flow of the serve">
+        <div class="section-head">
+          <div>
+            <h2>Flow</h2>
+            <p class="detail-help">How smoothly the whole serve runs, from the last ball bounce to landing. Follows the breakdown detail setting above.</p>
+          </div>
+          <span class="pill" id="flowPill">–</span>
+        </div>
+        <div id="flow"></div>
       </section>
 
       <section class="panel history-panel" aria-label="Progress">

@@ -12,7 +12,7 @@ const $ = (id) => document.getElementById(id);
 const video = $('video');
 const work = document.createElement('canvas');
 const viewer = createViewer({
-  video, canvas: $('overlay'), range: $('scrub'), markers: $('ticks'), time: $('time'),
+  video, canvas: $('overlay'), range: $('scrub'), markers: $('ticks'), keyJump: $('keyJump'), time: $('time'),
   play: $('play'), back: $('back'), fwd: $('fwd'), speed: $('speed'),
   showPose: $('showPose'), showBall: $('showBall'), showRacket: $('showRacket'), trimShade: $('trimShade'),
 });

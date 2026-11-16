@@ -6,7 +6,7 @@
 import { analyseServe, compareToPros, buildFeedback, ISSUES, exportMotion, pickPro } from './analysis.js';
 import { createComparison } from './compare.js';
 import { processVideo, loadVideoFile, workSize, isPhone } from './pipeline.js';
-import { renderSummary, renderPhases, renderHistory } from './dashboard.js';
+import { renderSummary, renderPhases, renderHistory, renderFlow } from './dashboard.js';
 import { createViewer } from './viewer.js';
 import { makeServe, FPS } from './synthetic.js';
 
@@ -21,7 +21,7 @@ let shownMotion = null; // that result's movement, for the stick-figure comparis
 const isPreview = Boolean(window.__PREVIEW);
 
 const viewer = createViewer({
-  video, canvas: $('overlay'), range: $('scrub'), markers: $('ticks'), time: $('time'),
+  video, canvas: $('overlay'), range: $('scrub'), markers: $('ticks'), keyJump: $('keyJump'), time: $('time'),
   play: $('play'), back: $('back'), fwd: $('fwd'), speed: $('speed'),
   showPose: $('showPose'), showBall: $('showBall'), showRacket: $('showRacket'), trimShade: $('trimShade'),
 });
@@ -42,7 +42,9 @@ function setDetail(d) {
   drawPhases();
 }
 function drawPhases() {
-  if (shown) renderPhases($('phases'), shown.comparison, heightCm(), detail, shown);
+  if (!shown) return;
+  renderPhases($('phases'), shown.comparison, heightCm(), detail, shown);
+  renderFlow($('flow'), $('flowPill'), shown, shown.comparison, heightCm(), detail);
 }
 document.querySelectorAll('#detailSeg button').forEach((b) => b.addEventListener('click', () => setDetail(Number(b.dataset.detail))));
 
@@ -53,11 +55,6 @@ document.querySelectorAll('#comparePanel .seg button').forEach((b) => b.addEvent
   document.querySelectorAll('#comparePanel .seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   comparison.setMode(b.dataset.mode);
 }));
-$('flipPro').addEventListener('click', () => {
-  const on = $('flipPro').getAttribute('aria-pressed') !== 'true';
-  $('flipPro').setAttribute('aria-pressed', String(on));
-  comparison.setFlip(on);
-});
 const motionCache = {};
 async function loadMotion(path) {
   if (window.__PRO_MOTIONS && window.__PRO_MOTIONS[path]) return window.__PRO_MOTIONS[path];
@@ -69,8 +66,6 @@ async function showComparison(r, motion) {
   if (!choice || !motion || !motion.frames.length) { $('comparePanel').classList.add('hidden'); return; }
   const proMotion = typeof choice.pro.motion === 'object' ? choice.pro.motion : await loadMotion(choice.pro.motion);
   comparison.set(motion, proMotion, choice.pro.id);
-  comparison.setFlip(false);
-  $('flipPro').setAttribute('aria-pressed', 'false');
   $('compareTitle').textContent = `You vs ${choice.pro.id}`;
   const p = choice.pro;
   $('compareNotes').innerHTML = `

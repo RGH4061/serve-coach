@@ -8,7 +8,7 @@ const BONES = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 
 const KEYS = [['tossPeak', 'Toss peak'], ['trophy', 'Trophy'], ['contact', 'Contact']];
 
 export function createViewer(els) {
-  const { video, canvas, range, markers, time, play, back, fwd, speed, showPose, showBall, showRacket, trimShade } = els;
+  const { video, canvas, range, markers, keyJump, time, play, back, fwd, speed, showPose, showBall, showRacket, trimShade } = els;
   const ctx = canvas.getContext('2d');
   const s = { mode: 'example', frames: [], keyFrames: {}, t: 0, playing: false, duration: 1, step: 1 / 60, prev: null, trim: null, onFrame: null };
 
@@ -74,18 +74,16 @@ export function createViewer(els) {
     }
   }
 
+  // Small marks on the timeline, plus a separate, easy-to-tap button for each key moment.
   function placeMarkers() {
-    // Labels that sit close together go on alternate rows so they don't overlap.
-    let lastPct = -100, row = 0;
-    markers.innerHTML = KEYS.filter(([k]) => Number.isFinite(s.keyFrames[k]))
-      .sort((a, b) => s.keyFrames[a[0]] - s.keyFrames[b[0]])
-      .map(([k, label]) => {
-        const pct = (s.keyFrames[k] / s.duration) * 100;
-        row = pct - lastPct < 12 ? 1 - row : 0;
-        lastPct = pct;
-        return `<button type="button" class="tick${row ? ' low' : ''}" data-key="${k}" style="left:${pct}%" title="Jump to ${label}">${label}</button>`;
-      }).join('');
-    markers.querySelectorAll('.tick').forEach((b) => b.addEventListener('click', () => { stop(); seek(s.keyFrames[b.dataset.key]); }));
+    const keys = KEYS.filter(([k]) => Number.isFinite(s.keyFrames[k])).sort((a, b) => s.keyFrames[a[0]] - s.keyFrames[b[0]]);
+    markers.innerHTML = keys.map(([k]) => `<span class="tick" style="left:${(s.keyFrames[k] / s.duration) * 100}%"></span>`).join('');
+    if (!keyJump) return;
+    keyJump.innerHTML = keys.length
+      ? `<span class="key-jump-label">Jump to</span>` + keys.map(([k, label]) =>
+        `<button type="button" class="key-btn" data-key="${k}">${label}<small>${s.keyFrames[k].toFixed(2)} s</small></button>`).join('')
+      : '';
+    keyJump.querySelectorAll('.key-btn').forEach((b) => b.addEventListener('click', () => { stop(); seek(s.keyFrames[b.dataset.key]); }));
   }
 
   function stop() { s.playing = false; video.pause(); play.textContent = 'Play'; }

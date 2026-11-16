@@ -64,7 +64,10 @@
         "driveSpeed": 1.088,
         "driveAccel": 9.376,
         "driveTime": 0.367,
-        "driveRise": 0.215
+        "driveRise": 0.215,
+        "flowSmoothness": -1.741,
+        "flowPause": 0,
+        "chainOrder": 3
       }
     },
     {
@@ -88,7 +91,10 @@
         "driveSpeed": 0.912,
         "driveAccel": 6.078,
         "driveTime": 0.456,
-        "driveRise": 0.256
+        "driveRise": 0.256,
+        "flowSmoothness": -1.767,
+        "flowPause": 0,
+        "chainOrder": 3
       },
       "level": "tour",
       "serves": 1,

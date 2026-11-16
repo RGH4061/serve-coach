@@ -10,6 +10,8 @@ export function fmt(value, unit, heightCm) {
   if (value === null || value === undefined || !Number.isFinite(value)) return '–';
   if (unit === '°') return `${value.toFixed(0)}°`;
   if (unit === 's') return `${value.toFixed(2)} s`;
+  if (unit === 'sparc') return value.toFixed(2);
+  if (unit === 'of 3') return `${Math.round(Math.max(0, Math.min(3, value)))} of 3`;
   if (unit === 'H/s') return heightCm ? `${((value * heightCm) / 100).toFixed(2)} m/s` : `${value.toFixed(2)} H/s`;
   if (unit === 'H/s²') return heightCm ? `${((value * heightCm) / 100).toFixed(1)} m/s²` : `${value.toFixed(1)} H/s²`;
   if (heightCm) {
@@ -121,6 +123,11 @@ function simpleBody(rows, st) {
     ${!good.length && !fix.length ? '<p class="plain">Not enough was seen in this clip to judge this part.</p>' : ''}`;
 }
 
+function proRange(row, heightCm) {
+  const a = fmt(row.lo, row.def.unit, heightCm), b = fmt(row.hi, row.def.unit, heightCm);
+  return a === b ? a : `${a} – ${b}`;
+}
+
 function metricRow(row, heightCm, level) {
   const st = statusOf(row.score);
   const proLine = level >= 3 && row.pros && row.pros.length
@@ -130,7 +137,7 @@ function metricRow(row, heightCm, level) {
       <div class="metric-head"><span>${esc(row.def.label)}</span><b>${fmt(row.value, row.def.unit, heightCm)}</b></div>
       ${gauge(row, heightCm)}
       <div class="metric-foot">
-        <span>${row.status === 'missing' ? '' : `Pro ${fmt(row.lo, row.def.unit, heightCm)} – ${fmt(row.hi, row.def.unit, heightCm)}`}</span>
+        <span>${row.status === 'missing' ? '' : `Pro ${proRange(row, heightCm)}`}</span>
         <span class="word ${st}">${level >= 3 && row.status !== 'missing' ? `${row.score} · ` : ''}${STATUS_WORD[st]}</span>
       </div>
       ${proLine}
@@ -180,4 +187,64 @@ export function renderHistory(el, history) {
       ${pts.map((p, i) => `<circle class="${i === n - 1 ? 'pt last' : 'pt'}" cx="${p[0]}" cy="${p[1]}" r="${i === n - 1 ? 5 : 3}"></circle>`).join('')}
       ${history.map((h, i) => (n <= 8 || i % Math.ceil(n / 8) === 0 || i === n - 1) ? `<text class="axis" x="${x(i)}" y="${Hh - 8}" text-anchor="middle">${date(h.date)}</text>` : '').join('')}
     </svg>`;
+}
+
+// ---------- flow of the serve ----------
+export function renderFlow(el, pill, r, comparison, heightCm, level = 2) {
+  const rows = comparison.rows.filter((row) => row.def.phase === 'flow');
+  const scored = rows.filter((x) => x.status !== 'missing');
+  const w = scored.reduce((a, x) => a + x.def.weight, 0);
+  const score = w ? Math.round(scored.reduce((a, x) => a + x.score * x.def.weight, 0) / w) : null;
+  const st = statusOf(score);
+  pill.className = `pill ${st}`;
+  pill.textContent = score ?? '–';
+  const c = r.flow;
+  const chart = c && c.t.length > 3 ? flowChart(c, heightCm, level) : '<p class="empty-note">Not enough of the motion was seen to draw the flow.</p>';
+  const body = level <= 1
+    ? `<div class="flow-simple">${simpleBody(rows, st)}</div>`
+    : `<div class="flow-metrics">${rows.filter((x) => x.def.level <= level).map((x) => metricRow(x, heightCm, level)).join('')}</div>`;
+  el.innerHTML = chart + body;
+}
+
+function flowChart(c, heightCm, level) {
+  const ts = c.timeScale || 1;
+  const t0 = c.marks.contact;
+  const xs = c.t.map((t) => (t - t0) / ts);
+  const ys = c.v.map((v) => (heightCm ? (v * heightCm) / 100 : v));
+  const W = 1000, Hc = 220, padL = 44, padR = 16, padT = 34, padB = 30;
+  const xMin = xs[0], xMax = xs[xs.length - 1];
+  const yMax = Math.max(...ys) * 1.1 || 1;
+  const X = (x) => padL + ((x - xMin) / (xMax - xMin || 1)) * (W - padL - padR);
+  const Y = (y) => padT + (1 - y / yMax) * (Hc - padT - padB);
+  const line = xs.map((x, i) => `${i ? 'L' : 'M'}${X(x).toFixed(1)},${Y(ys[i]).toFixed(1)}`).join(' ');
+  const area = `${line} L${X(xMax).toFixed(1)},${Y(0)} L${X(xMin).toFixed(1)},${Y(0)} Z`;
+  const unit = heightCm ? 'm/s' : 'H/s';
+  const names = [['bounce', 'Bounce'], ['start', 'Motion starts'], ['trophy', 'Trophy'], ['contact', 'Contact'], ['landing', 'Landing']];
+  let lastX = -1e9, row = 0;
+  const marks = names.filter(([k]) => Number.isFinite(c.marks[k])).map(([k, label]) => {
+    const x = X((c.marks[k] - t0) / ts);
+    row = x - lastX < 90 ? 1 - row : 0;
+    lastX = x;
+    return `<line class="mark" x1="${x}" x2="${x}" y1="${padT - 6}" y2="${Y(0)}"></line>
+      <text class="mark-label" x="${x}" y="${row ? 26 : 12}" text-anchor="${x > W - 80 ? 'end' : x < padL + 40 ? 'start' : 'middle'}">${label}</text>`;
+  }).join('');
+  const pause = c.pause ? `<rect class="pause" x="${X((c.pause[0] - t0) / ts)}" y="${padT}" width="${Math.max(2, X((c.pause[1] - t0) / ts) - X((c.pause[0] - t0) / ts))}" height="${Y(0) - padT}"></rect>` : '';
+  const chain = level >= 3 && c.chainPeaks ? Object.entries({ Hip: c.chainPeaks.hips, Shoulder: c.chainPeaks.shoulders, Elbow: c.chainPeaks.elbow, Wrist: c.chainPeaks.wrist })
+    .map(([label, t], i) => `<circle class="chain" cx="${X((t - t0) / ts)}" cy="${Y(0) - 8 - i * 9}" r="3.5"></circle><text class="axis" x="${X((t - t0) / ts) + (i % 2 ? -7 : 7)}" y="${Y(0) - 5 - i * 9}" text-anchor="${i % 2 ? 'end' : 'start'}">${label}</text>`).join('') : '';
+  const ticks = [];
+  for (let v = Math.ceil(xMin * 2) / 2; v <= xMax; v += 0.5) ticks.push(v);
+  return `
+    <svg class="chart flow-chart" viewBox="0 0 ${W} ${Hc}" role="img" aria-label="Whole-body speed from the bounce to landing">
+      <line class="grid" x1="${padL}" x2="${W - padR}" y1="${Y(0)}" y2="${Y(0)}"></line>
+      <line class="grid" x1="${padL}" x2="${W - padR}" y1="${Y(yMax / 1.1)}" y2="${Y(yMax / 1.1)}"></line>
+      <text class="axis" x="${padL - 6}" y="${Y(yMax / 1.1) + 4}" text-anchor="end">${(yMax / 1.1).toFixed(1)}</text>
+      <text class="axis" x="${padL - 6}" y="${Y(0) + 4}" text-anchor="end">0</text>
+      ${pause}
+      <path class="area" d="${area}"></path>
+      <path class="line" d="${line}"></path>
+      ${marks}
+      ${chain}
+      ${ticks.map((v) => `<text class="axis" x="${X(v)}" y="${Hc - 8}" text-anchor="middle">${v === 0 ? '0 s' : `${v > 0 ? '+' : ''}${v.toFixed(1)}`}</text>`).join('')}
+    </svg>
+    <p class="footnote">Whole-body speed (${unit}) in real time, relative to contact. A smooth serve builds speed in one continuous wave into contact${c.pause ? '; the shaded band is your longest pause' : ''}.</p>`;
 }
